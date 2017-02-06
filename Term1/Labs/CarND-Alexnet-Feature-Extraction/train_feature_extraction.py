@@ -70,7 +70,7 @@ im2 = im2 - np.mean(im2)
 # Run Inference
 t = time.time()
 
-EPOCHS = 30
+EPOCHS = 100
 BATCH_SIZE = 512
 
 def evaluate(X_data, y_data):
@@ -111,3 +111,6 @@ for input_im_ind in range(output.shape[0]):
     print()
 
 print("Time: %.3f seconds" % (time.time() - t))
+
+print("--------------------------")
+print(output)
