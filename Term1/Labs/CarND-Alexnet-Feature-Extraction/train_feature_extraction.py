@@ -4,6 +4,9 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from alexnet import AlexNet
 from sklearn.utils import shuffle
+from scipy.misc import imread
+import time
+import numpy as np
 
 # TODO: Load traffic signs data.
 with open('train.p', 'rb') as f:
@@ -58,9 +61,17 @@ accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 saver = tf.train.Saver()
 
 # TODO: Train and evaluate the feature extraction model.
+# Read Images
+im1 = imread("construction.jpg").astype(np.float32)
+im1 = im1 - np.mean(im1)
 
-EPOCHS = 10
-BATCH_SIZE = 128
+im2 = imread("stop.jpg").astype(np.float32)
+im2 = im2 - np.mean(im2)
+# Run Inference
+t = time.time()
+
+EPOCHS = 30
+BATCH_SIZE = 512
 
 def evaluate(X_data, y_data):
     num_examples = len(X_data)
@@ -89,4 +100,14 @@ with tf.Session() as sess:
         print()
     saver.save(sess, './lenet')
     print("Model saved")
+    output = sess.run(logits, feed_dict={x: [im1, im2], keep_probability: 1.0})
 
+# Print Output
+for input_im_ind in range(output.shape[0]):
+    inds = np.argsort(output)[input_im_ind, :]
+    print("Image", input_im_ind)
+    for i in range(5):
+        print("%s: %.3f" % (labelmap[inds[-1 - i]], output[input_im_ind, inds[-1 - i]]))
+    print()
+
+print("Time: %.3f seconds" % (time.time() - t))
