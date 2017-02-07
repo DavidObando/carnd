@@ -6,3 +6,5 @@ models
 *.p
 traffic-signs-data.zip
 German Traffic Signs
+checkpoint
+lenet*
