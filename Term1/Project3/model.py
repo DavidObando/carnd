@@ -25,19 +25,19 @@ def make_model(n_classes, dropout_rate=0.5, regularizer_rate=0.0001):
     model.add(Convolution2D(32, 3, 3, border_mode='valid', input_shape=(32, 32, 3)))
     # Add a max pooling of 2x2
     model.add(MaxPooling2D(pool_size=(2, 2)))
-    # Add a dropout
-    model.add(Dropout(dropout_rate))
     # Add a ReLU activation layer
     model.add(Activation('relu'))
+    # Add a dropout
+    model.add(Dropout(dropout_rate))
 
     # Add a convolution with 64 filters, 2x2 kernel, and valid padding
     model.add(Convolution2D(64, 2, 2, border_mode='valid'))
     # Add a max pooling of 2x2
     model.add(MaxPooling2D(pool_size=(2, 2)))
-    # Add a dropout
-    model.add(Dropout(dropout_rate))
     # Add a ReLU activation layer
     model.add(Activation('relu'))
+    # Add a dropout
+    model.add(Dropout(dropout_rate))
 
     # Add a flatten layer
     model.add(Flatten())
@@ -46,14 +46,14 @@ def make_model(n_classes, dropout_rate=0.5, regularizer_rate=0.0001):
     model.add(Dense(128))
     # Add a ReLU activation layer
     model.add(Activation('relu'))
+    # Add a dropout
+    model.add(Dropout(dropout_rate))
     # Add a fully connected layer
     #model.add(Dense(n_classes, W_regularizer=l2(regularizer_rate), activity_regularizer=activity_l2(regularizer_rate)))
     model.add(Dense(n_classes))
-    # Add a ReLU activation layer
-    model.add(Activation('softmax'))
     print(model.summary())
 
-    model.compile(optimizer='rmsprop', loss='mse', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='mse', metrics=['accuracy'])
     return model
 
 def resize_image(image_in, dimensions=(32,32)):
@@ -68,11 +68,10 @@ def read_image_data(path):
     """
     return np.array(resize_image(mpimg.imread(path)))
 
-def load_data():
+def load_data(data_folder="./data/"):
     """
-    Loads the training data
+    Loads the training data from the specified folder
     """
-    data_folder = "./data/"
     pickle_file = data_folder + "data.pickle"
     if os.path.exists(pickle_file):
         print('Loading data from pickle file...')
@@ -88,12 +87,9 @@ def load_data():
         reader = csv.DictReader(csvfile)
         for row in reader:
             #center,left,right,steering,throttle,brake,speed
-            images.append(read_image_data(data_folder + row["center"].strip()))
-            steering.append(float(row["steering"]))
-            images.append(read_image_data(data_folder + row["left"].strip()))
-            steering.append(float(row["steering"]))
-            images.append(read_image_data(data_folder + row["right"].strip()))
-            steering.append(float(row["steering"]))
+            for i in ["center", "left", "right"]:
+                images.append(read_image_data(data_folder + row[i].strip()))
+                steering.append(float(row["steering"]))
     images = np.array(images)
     steering = np.array(steering)
     print('Saving data to pickle file...')
@@ -122,13 +118,17 @@ def normalize_minmax(image_data):
     grayscale_max = 255
     return a + ( ( (image_data - grayscale_min)*(b - a) )/( grayscale_max - grayscale_min ) )
 
-X_train, y_train = shuffle(load_data())
-n_train = len(X_train)
-assert n_train == len(y_train)
-print("X shape", X_train.shape)
-print("y shape", y_train.shape)
-
-X_normalized = normalize_minmax(X_train)
-
 model = make_model(1)
-history = model.fit(X_normalized, y_train, batch_size=256, nb_epoch=20, validation_split=0.2)
+for source in ["./data/", "./data-david-track1-1/", "./data-david-track1-2/", "./data-david-track2-1/"]:
+    X_train, y_train = load_data(source)
+    X_train, y_train = shuffle(X_train, y_train)
+    n_train = len(X_train)
+    assert n_train == len(y_train)
+    print("X shape", X_train.shape)
+    print("X dims", X_train.ndim)
+    print("y shape", y_train.shape)
+    print("y dims", y_train.ndim)
+    X_normalized = normalize_minmax(X_train)
+    y_normalized = np.array([0 if val == 0 else -1 if val < 0 else 1 for val in y_train], dtype=int)
+    history = model.fit(X_normalized, y_normalized, batch_size=512, nb_epoch=100, validation_split=0.2)
+
