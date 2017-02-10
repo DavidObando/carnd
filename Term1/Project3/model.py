@@ -16,6 +16,25 @@ import tensorflow as tf
 
 tf.python.control_flow_ops = tf
 
+def reflect_image(image):
+    return image
+
+class reflection(object):
+    def __init__(self, images):
+        self.images = images
+        self.current = 0
+        self.size = len(images)
+    def __iter__(self):
+        return self
+    def __next__(self):
+        return self._next()
+    def _next(self):
+        if self.current < self.size:
+            image, self.current = self.images[self.current], self.current + 1
+            return reflect_image(image)
+        else:
+            raise StopIteration()
+
 def make_model(n_classes, dropout_rate=0.5, regularizer_rate=0.0001):
     """
     Creates the keras model used for our network
@@ -129,6 +148,7 @@ for source in ["./data/", "./data-david-track1-1/", "./data-david-track1-2/", ".
     print("y shape", y_train.shape)
     print("y dims", y_train.ndim)
     X_normalized = normalize_minmax(X_train)
-    y_normalized = np.array([0 if val == 0 else -1 if val < 0 else 1 for val in y_train], dtype=int)
+    #y_normalized = np.array([0 if val == 0 else -1 if val < 0 else 1 for val in y_train], dtype=int)
+    y_normalized = y_train
     history = model.fit(X_normalized, y_normalized, batch_size=512, nb_epoch=100, validation_split=0.2)
 

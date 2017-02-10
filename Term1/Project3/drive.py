@@ -14,11 +14,19 @@ from io import BytesIO
 
 from keras.models import load_model
 
+import cv2
+
 sio = socketio.Server()
 app = Flask(__name__)
 model = None
 prev_image_array = None
 
+# Image resize
+def resize_image(image_in, dimensions=(32,32)):
+    """
+    Resizes the input image to the specified dimensions
+    """
+    return cv2.resize(image_in, dimensions, interpolation = cv2.INTER_AREA)
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -32,8 +40,9 @@ def telemetry(sid, data):
         # The current image from the center camera of the car
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
-        image_array = np.asarray(image)
-        steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
+        image_array = resize_image(np.asarray(image))
+        #steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
+        steering_angle = 0
         throttle = 0.2
         print(steering_angle, throttle)
         send_control(steering_angle, throttle)
