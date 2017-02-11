@@ -21,12 +21,28 @@ app = Flask(__name__)
 model = None
 prev_image_array = None
 
+def normalize_minmax(image_data):
+    """
+    Normalize the image data with Min-Max scaling to a range of [-0.5, 0.5]
+    :param image_data: The image data to be normalized
+    :return: Normalized image data
+    """
+    a = -0.5
+    b = 0.5
+    grayscale_min = 0
+    grayscale_max = 255
+    return a + ( ( (image_data - grayscale_min)*(b - a) )/( grayscale_max - grayscale_min ) )
+
 # Image resize
-def resize_image(image_in, dimensions=(32,32)):
+def resize_image(image_in, dimensions=(64,16)):
     """
     Resizes the input image to the specified dimensions
     """
-    return cv2.resize(image_in, dimensions, interpolation = cv2.INTER_AREA)
+    top = 60
+    bottom = 140
+    left = 0
+    right = len(image_in[0]) - 1
+    return normalize_minmax(cv2.resize(image_in[top:bottom, left:right], dimensions, interpolation = cv2.INTER_AREA))
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -41,8 +57,7 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = resize_image(np.asarray(image))
-        #steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
-        steering_angle = 0
+        steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
         throttle = 0.2
         print(steering_angle, throttle)
         send_control(steering_angle, throttle)
