@@ -216,12 +216,8 @@ Result
 ---
 Here's a video of the car simulator being driven by this neural network.
 
-<video width="320" height="160" controls>
-  <source src="./run1.mp4">
-</video>
+  * Run 1 [video](https://youtu.be/8LzlX5nZHKk)
+  * Run 2 [video](https://youtu.be/Ui_4S9Klvlc)
 
-Here's a longer run:
+Also available for download from [my Github repository](https://github.com/DavidObando/carnd/tree/master/Term1/Project3).
 
-<video width="320" height="160" controls>
-  <source src="./run2.mp4">
-</video>
