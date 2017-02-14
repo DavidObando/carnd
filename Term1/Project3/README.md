@@ -156,6 +156,74 @@ I recurred to the NVidia whitepaper titled End-to-End Learning for Self-Driving 
 27.	Activation (Relu)
 28.	Compile (Adam optimizer, MSE loss)
 
+Here's a visualization of this model, taken from the NVidia [whitepaper](http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf):
+
+[image0]: ./nvidia-model.png "NVidia model"
+![NVidia model][image0]
+
+This is the summary Keras gives of the model:
+
+```
+____________________________________________________________________________________________________
+Layer (type)                     Output Shape          Param #     Connected to                     
+====================================================================================================
+convolution2d_1 (Convolution2D)  (None, 6, 30, 24)     1824        convolution2d_input_1[0][0]      
+____________________________________________________________________________________________________
+activation_1 (Activation)        (None, 6, 30, 24)     0           convolution2d_1[0][0]            
+____________________________________________________________________________________________________
+dropout_1 (Dropout)              (None, 6, 30, 24)     0           activation_1[0][0]               
+____________________________________________________________________________________________________
+convolution2d_2 (Convolution2D)  (None, 3, 15, 36)     21636       dropout_1[0][0]                  
+____________________________________________________________________________________________________
+activation_2 (Activation)        (None, 3, 15, 36)     0           convolution2d_2[0][0]            
+____________________________________________________________________________________________________
+dropout_2 (Dropout)              (None, 3, 15, 36)     0           activation_2[0][0]               
+____________________________________________________________________________________________________
+convolution2d_3 (Convolution2D)  (None, 2, 8, 48)      43248       dropout_2[0][0]                  
+____________________________________________________________________________________________________
+activation_3 (Activation)        (None, 2, 8, 48)      0           convolution2d_3[0][0]            
+____________________________________________________________________________________________________
+dropout_3 (Dropout)              (None, 2, 8, 48)      0           activation_3[0][0]               
+____________________________________________________________________________________________________
+convolution2d_4 (Convolution2D)  (None, 2, 8, 64)      27712       dropout_3[0][0]                  
+____________________________________________________________________________________________________
+activation_4 (Activation)        (None, 2, 8, 64)      0           convolution2d_4[0][0]            
+____________________________________________________________________________________________________
+dropout_4 (Dropout)              (None, 2, 8, 64)      0           activation_4[0][0]               
+____________________________________________________________________________________________________
+convolution2d_5 (Convolution2D)  (None, 2, 8, 64)      36928       dropout_4[0][0]                  
+____________________________________________________________________________________________________
+activation_5 (Activation)        (None, 2, 8, 64)      0           convolution2d_5[0][0]            
+____________________________________________________________________________________________________
+dropout_5 (Dropout)              (None, 2, 8, 64)      0           activation_5[0][0]               
+____________________________________________________________________________________________________
+flatten_1 (Flatten)              (None, 1024)          0           dropout_5[0][0]                  
+____________________________________________________________________________________________________
+dense_1 (Dense)                  (None, 1164)          1193100     flatten_1[0][0]                  
+____________________________________________________________________________________________________
+activation_6 (Activation)        (None, 1164)          0           dense_1[0][0]                    
+____________________________________________________________________________________________________
+dropout_6 (Dropout)              (None, 1164)          0           activation_6[0][0]               
+____________________________________________________________________________________________________
+dense_2 (Dense)                  (None, 100)           116500      dropout_6[0][0]                  
+____________________________________________________________________________________________________
+activation_7 (Activation)        (None, 100)           0           dense_2[0][0]                    
+____________________________________________________________________________________________________
+dropout_7 (Dropout)              (None, 100)           0           activation_7[0][0]               
+____________________________________________________________________________________________________
+dense_3 (Dense)                  (None, 50)            5050        dropout_7[0][0]                  
+____________________________________________________________________________________________________
+activation_8 (Activation)        (None, 50)            0           dense_3[0][0]                    
+____________________________________________________________________________________________________
+dropout_8 (Dropout)              (None, 50)            0           activation_8[0][0]               
+____________________________________________________________________________________________________
+dense_4 (Dense)                  (None, 1)             51          dropout_8[0][0]                  
+====================================================================================================
+Total params: 1,446,049
+Trainable params: 1,446,049
+Non-trainable params: 0
+```
+
 ## Reduction of model overfitting
 
 The architecture does contain dropout layers, which by default have been configured to be 50% during model training.
@@ -180,6 +248,10 @@ I loaded the images and did the following transformations:
 
 1.	Trim the image so only the road section is fed into the model
 2.	Resize to 64 pixels wide by 16 pixels tall.
+
+The trimming was done by keeping the entire width of the image, but only keeping the window of pixes from top = 60 to bottom = 140. These values were determined "by hand", simply by opening a sample set of images in an editor and figuring out that this is where most of them would contain the road information. A much better approach would involve computer vision algorithms to detect where the road is and transform that information into an ever more usable set of data, as I've learned we'll be doing in P4.
+
+The resizing of the image to 64x16 was intentionally made to keep the trimmed image form factor while reducing the memory requirements. The original image after being trimmed was still 320x120 and I wanted to approximate something closer to 32x32 initially, just to keep the memory pressure down.
 
 Following that, I wanted to make use of the left and right camera data, not only the center camera data. Given that these cameras are offset from the center I modified the steering angle associated to them as indicated in the NVidia whitepaper. From the [whitepaper](http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf):
 
