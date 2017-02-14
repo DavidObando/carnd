@@ -25,22 +25,6 @@ tf.python.control_flow_ops = tf
 def reflect_image(image):
     return cv2.flip(image, 1)
 
-class reflection(object):
-    def __init__(self, images):
-        self.images = images
-        self.current = 0
-        self.size = len(images)
-    def __iter__(self):
-        return self
-    def __next__(self):
-        return self._next()
-    def _next(self):
-        if self.current < self.size:
-            image, self.current = self.images[self.current], self.current + 1
-            return reflect_image(image)
-        else:
-            raise StopIteration()
-
 # Image resize
 def resize_image(image_in, dimensions=(64,16)):
     """
@@ -52,6 +36,51 @@ def resize_image(image_in, dimensions=(64,16)):
     right = len(image_in[0]) - 1
     return cv2.resize(image_in[top:bottom, left:right], dimensions, interpolation = cv2.INTER_AREA)
 
+
+## Data preprocessing and normalization
+def balance(X_input, y_input):
+    """
+    It will take the data input and attempt to balance the data set so that
+    the training isn't squewed towards any given class
+    """
+    #fig, axes = plt.subplots(1, 2)
+    #axes[0].imshow(X_train[0])
+    #axes[0].set_title("Image 1")
+    #axes[0].axis("off")
+    #axes[1].imshow(reflect_image(X_train[0]))
+    #axes[1].set_title("Reflected image 1")
+    #axes[1].axis("off")
+    #plt.show()
+    #plt.hist(y_input, bins=100)
+    #plt.title("Count of images (y) per class (x) before augmentation")
+    #plt.show()
+    tupni_X = [reflect_image(i) for i in X_input]
+    tupni_y = [-i for i in y_input]
+    #plt.show()
+    #plt.hist(tupni_y, bins=100)
+    #plt.title("Count of reflected images (y) per class (x) before augmentation")
+    #plt.show()
+    X_output = np.concatenate((X_input, tupni_X), axis=0)
+    y_output = np.concatenate((y_input, tupni_y), axis=0)
+    #plt.hist(y_output, bins=100)
+    #plt.title("Count of images (y) per class (x) after augmentation")
+    #plt.show()
+    #print(y_input[0])
+    #print(tupni_y[0])
+    return X_output, y_output
+
+
+def normalize_minmax(image_data):
+    """
+    Normalize the image data with Min-Max scaling to a range of [-0.5, 0.5]
+    :param image_data: The image data to be normalized
+    :return: Normalized image data
+    """
+    a = -0.5
+    b = 0.5
+    grayscale_min = 0
+    grayscale_max = 255
+    return a + ( ( (image_data - grayscale_min)*(b - a) )/( grayscale_max - grayscale_min ) )
 
 ## Data loading utilities
 def read_image_data(path):
@@ -110,57 +139,36 @@ def load_data(data_folder="./data/"):
         raise
     return images, steering
 
-## Data preprocessing and normalization
-def balance(X_input, y_input):
+def generator_load_data(data_folder="./data/"):
     """
-    It will take the data input and attempt to balance the data set so that
-    the training isn't squewed towards any given class
+    Loads the training data from the specified folder as a Python GeneratorExit
+    Note that this function also calls balance() to augment the dataset and calls
+    normalize_minmax() to normalize the data.
     """
-    fig, axes = plt.subplots(1, 2)
-    axes[0].imshow(X_train[0])
-    axes[0].set_title("Image 1")
-    axes[0].axis("off")
-    axes[1].imshow(reflect_image(X_train[0]))
-    axes[1].set_title("Reflected image 1")
-    axes[1].axis("off")
-    plt.show()
-    plt.hist(y_input, bins=100)
-    plt.title("Count of images (y) per class (x) before augmentation")
-    plt.show()
-    tupni_X = [reflect_image(i) for i in X_input]
-    tupni_y = [-i for i in y_input]
-    plt.show()
-    plt.hist(tupni_y, bins=100)
-    plt.title("Count of reflected images (y) per class (x) before augmentation")
-    plt.show()
-    X_output = np.concatenate((X_input, tupni_X), axis=0)
-    y_output = np.concatenate((y_input, tupni_y), axis=0)
-    plt.hist(y_output, bins=100)
-    plt.title("Count of images (y) per class (x) after augmentation")
-    plt.show()
-    print(y_input[0])
-    print(tupni_y[0])
-    return X_output, y_output
-
-source = "./data/"
-data_pickle = source + "data.pickle"
-if os.path.exists(data_pickle):
-    os.remove(data_pickle)
-
-X_train, y_train = load_data(source)
-X_train, y_train = balance(X_train, y_train)
-
-def normalize_minmax(image_data):
-    """
-    Normalize the image data with Min-Max scaling to a range of [-0.5, 0.5]
-    :param image_data: The image data to be normalized
-    :return: Normalized image data
-    """
-    a = -0.5
-    b = 0.5
-    grayscale_min = 0
-    grayscale_max = 255
-    return a + ( ( (image_data - grayscale_min)*(b - a) )/( grayscale_max - grayscale_min ) )
+    angle_adjustment = 0.15
+    center_image_retention_rate = 0.1
+    while 1:
+        with open(data_folder + "driving_log.csv", 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                steering_angle = float(row["steering"])
+                if steering_angle == 0:
+                    # decide if this one is going to be retained
+                    if random.random() > center_image_retention_rate:
+                        continue
+                #center,left,right,steering,throttle,brake,speed
+                x_output = np.array([
+                    read_image_data(data_folder + row["center"].strip()),
+                    read_image_data(data_folder + row["left"].strip()),
+                    read_image_data(data_folder + row["right"].strip())])
+                y_output = np.array([
+                    steering_angle,
+                    steering_angle + angle_adjustment,
+                    steering_angle - angle_adjustment
+                ])
+                x_output, y_output = balance(x_output, y_output)
+                x_output = normalize_minmax(x_output)
+                yield (x_output, y_output)
 
 ## Model definition
 def nvidia_make_model(n_classes, input_shape, dropout_rate=0.5, learning_rate=0.00005):
@@ -205,7 +213,7 @@ def nvidia_make_model(n_classes, input_shape, dropout_rate=0.5, learning_rate=0.
     return model
 
 
-def make_model(n_classes, input_shape, dropout_rate=0.5, regularizer_rate=0.0001):
+def simple_make_model(n_classes, input_shape, dropout_rate=0.5, regularizer_rate=0.0001):
     """
     Creates the keras model used for our network
     """
@@ -256,7 +264,6 @@ model = nvidia_make_model(1, X_train[0].shape)
 # train the model
 
 all_data_sources = ["./data/", "./data-david-track1-1/", "./data-david-track1-2/"]
-
 for source in all_data_sources:
     print("Training data from", source)
     X_train, y_train = load_data(source)
@@ -265,6 +272,14 @@ for source in all_data_sources:
     X_train, y_train = balance(X_train, y_train)
     X_normalized = normalize_minmax(X_train)
     history = model.fit(X_normalized, y_train, batch_size=512, nb_epoch=1000, validation_split=0.2)
+
+#Generator version of my code:
+#history = model.fit_generator(
+#    generator=generator_load_data("./data/"),
+#    samples_per_epoch=20000,
+#    nb_epoch=1000,
+#    validation_data=generator_load_data("./data-david-track1-2/"),
+#    nb_val_samples=4000)
 
 print("Done training")
 
