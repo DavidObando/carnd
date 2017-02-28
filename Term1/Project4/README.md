@@ -1,19 +1,4 @@
-## Advanced Lane Finding
-[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
-
-
-In this project, your goal is to write a software pipeline to identify the lane boundaries in a video, but the main output or product we want you to create is a detailed writeup of the project.  Check out the [writeup template](https://github.com/udacity/CarND-Advanced-Lane-Lines/blob/master/writeup_template.md) for this project and use it as a starting point for creating your own writeup.  
-
-Creating a great writeup:
----
-A great writeup should include the rubric points as well as your description of how you addressed each point.  You should include a detailed description of the code used in each step (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
-
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
-
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
-
-The Project
----
+**Advanced Lane Finding Project**
 
 The goals / steps of this project are the following:
 
@@ -26,10 +11,61 @@ The goals / steps of this project are the following:
 * Warp the detected lane boundaries back onto the original image.
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
-The images for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing your pipeline on single frames.  If you want to extract more test images from the videos, you can simply use an image writing method like `cv2.imwrite()`, i.e., you can read the video in frame by frame as usual, and for frames you want to save for later you can write to an image file.  
+[//]: # (Image References)
 
-To help the reviewer examine your work, please save examples of the output from each stage of your pipeline in the folder called `ouput_images`, and include a description in your writeup for the project of what each image shows.    The video called `project_video.mp4` is the video your pipeline should work well on.  
+[calibration1]: ./output_images/camera_calibration.jpg "Calibration"
+[calibration2]: ./test_images/extra_image.jpg "Image"
+[calibration3]: ./output_images/1.undistorted-extra_image.jpg "Undistorted image"
+[binary1]: ./test_images/extra_image.jpg "Image"
+[binary2]: ./output_images/2.binary-extra_image.jpg "Binary thresholded image"
+[video1]: ./processed_project_video.mp4 "Video"
 
-The `challenge_video.mp4` video is an extra (and optional) challenge for you if you want to test your pipeline under somewhat trickier conditions.  The `harder_challenge.mp4` video is another optional challenge and is brutal!
+## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
 
-If you're feeling ambitious (again, totally optional though), don't stop there!  We encourage you to go out and take video of your own, calibrate your camera and show us how you would implement this project from scratch!
+### Camera Calibration
+
+#### Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
+
+The code for this section is contained in lines 15 through 59 of the file called `p4.py`. I'm saving the values I compute to a pickle file for easy access given the iterative nature of this project. If the pickle file doesn't exist then I compute the camera calibration values. The steps I follow to compute this:
+  1. Convert the image to grayscale
+  2. Try to find the chessboard corners using cv2.findChessboardCorners
+  3. If found, I add them to the collections tracking the object points and image points
+
+These collections of points are what allows us to calibrate images. Object points is simply a set of points in the x- and y-axis of the picture. We don't calibrate on the z-axis as this axis is not spatial data but color channel data. We simply create a flat distribution of points in a `9 x 6` grid and call it the object points. Image points are what we find from calling cv2.findChessboardCorners.
+
+These points will be used to calibrate pictures by calling cv2.calibrateCamera with the object points and image points as reference to what type of distortions the image presents.
+
+### Pipeline (test images)
+
+#### Provide an example of a distortion-corrected image.
+This is one of the camera calibration pictures corrected using the data obtained in the previous step.
+
+![Calibration][calibration1]
+
+The code for this section is contained in lines 62 through 66 of the file called `p4.py`.
+
+Here's an action snap from the road:
+![Calibration][calibration2]
+
+And now, calibrated:
+![Calibration][calibration3]
+
+
+#### Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image. Provide an example of a binary image result.
+
+The code for this section is contained in lines 69 through 96 of the file called `p4.py`. I created 2 functions, so I'll detail them both:
+
+##### Function `thresholded_binary`
+The function expects an RGB image and converts it to HSV color space. It then runs cv2.sobel on L channel to obtain the gradient with respect to the X coordinate. The result of sobel is averaged and scaled to enable comparison against an 8-bit threshold. We then compare the sobel to see if it lands within the specified gradient threshold (with values `[20, 100]` by default).
+
+Then, the function detects which entries in the S channel fall within a threshold (with values `[170, 255]` by default). This is so the S channel tells us where the color saturation is high regardless of the color of the are we look at. This is useful as sometimes it's hard to see lines when they are under tree shades or on clear concrete.
+
+Both the x-gradient on the L channel and the value on the S channel are taken into account to compute a bitmap of 1s and 0z that tell us where the areas of interest are, where the colors change on the x-axis, and where the saturation of the colors is most visible.
+
+##### Function `double_thresholded_binary`
+The function also expects an RGB image as it forwards the call to `thresholded_binary`. However, after the thresholded binary image is obtained, it creates a black-and-white RGB image based on it and sends it a second time to function `thresholded_binary`. This turned out to provide amazing effects when dealing with shadows and other color changes on the road.
+
+Here's the result of the double thresholded binary function:
+![Binary][binary2]
+
+#### Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
