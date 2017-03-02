@@ -125,7 +125,7 @@ def perspective_transform(img):
             (450, 700)
         ])
     M = cv2.getPerspectiveTransform(src, dst)
-    w2 = cv2.warpPerspective(w1, M, shape, flags=cv2.INTER_LINEAR)
+    w2 = cv2.warpPerspective(w1, M, (img.shape[0:2][1], img.shape[0:2][0]), flags=cv2.INTER_LINEAR)
     mask = np.zeros_like(img)
     work_area2 = np.array([[(imshape[1]/4, 0), (imshape[1]/4*3, 0), (imshape[1]/3*2, imshape[0]), (imshape[1]/3, imshape[0])]], dtype=np.int32)
     cv2.fillPoly(mask, work_area2, ignore_mask_color)
@@ -133,28 +133,10 @@ def perspective_transform(img):
 
 # Lane line polynomials
 def lane_line_polynomials(img, last_known_polynomials):
-    # Assuming you have created a warped binary image called "binary_warped"
-    # Take a histogram of the bottom half of the image
-    histogram = np.sum(img[img.shape[0]/2:,:], axis=0)
-    # Create an output image to draw on and  visualize the result
-    out_img = np.dstack((img, img, img))*0
-    # Find the peak of the left and right halves of the histogram
-    # These will be the starting point for the left and right lines
-    midpoint = np.int(histogram.shape[0]/2)
-    leftx_base = np.argmax(histogram[:midpoint])
-    rightx_base = np.argmax(histogram[midpoint:]) + midpoint
-
-    # Choose the number of sliding windows
-    nwindows = 25 #9
-    # Set height of windows
-    window_height = np.int(img.shape[0]/nwindows)
     # Identify the x and y positions of all nonzero pixels in the image
     nonzero = img.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
-    # Current positions to be updated for each window
-    leftx_current = leftx_base
-    rightx_current = rightx_base
     # Set the width of the windows +/- margin
     margin = 20 #50
     # Set minimum number of pixels found to recenter window
@@ -164,6 +146,23 @@ def lane_line_polynomials(img, last_known_polynomials):
     right_lane_inds = []
     
     if last_known_polynomials is None:
+        # Take a histogram of the bottom half of the image
+        histogram = np.sum(img[img.shape[0]/2:,:], axis=0)
+        
+        # Choose the number of sliding windows
+        nwindows = 25 #9
+        # Set height of windows
+        window_height = np.int(img.shape[0]/nwindows)
+
+        # Find the peak of the left and right halves of the histogram
+        # These will be the starting point for the left and right lines
+        midpoint = np.int(histogram.shape[0]/2)
+        leftx_base = np.argmax(histogram[:midpoint])
+        rightx_base = np.argmax(histogram[midpoint:]) + midpoint
+        # Current positions to be updated for each window
+        leftx_current = leftx_base
+        rightx_current = rightx_base
+
         # Step through the windows one by one
         for window in range(nwindows):
             # Identify window boundaries in x and y (and right and left)
@@ -207,9 +206,15 @@ def lane_line_polynomials(img, last_known_polynomials):
     # Calculate curvature
     ploty = np.linspace(0, img.shape[0]-1, img.shape[0])
     y_eval = np.max(ploty)
-    left_curverad = ((1 + (2*left_fit[0]*y_eval + left_fit[1])**2)**1.5) / np.absolute(2*left_fit[0])
-    right_curverad = ((1 + (2*right_fit[0]*y_eval + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
-            
+    ym_per_pix = 30/720 # meters per pixel in y dimension
+    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+    # Fit new polynomials to x,y in world space
+    left_fit_cr = np.polyfit(lefty*ym_per_pix, leftx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(righty*ym_per_pix, rightx*xm_per_pix, 2)
+    # Calculate the radii of curvature
+    left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+
     # Calculate the points for the left and right sides of the fit
     left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
     right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
@@ -239,18 +244,26 @@ def lane_line_polynomials(img, last_known_polynomials):
     elif replace_right:
         right_line_window = ((np.array([np.flipud(left_line_window[0])]) + [base_delta, 0]) * [1, 0]) + (right_line_window * [0, 1])
         right_curverad = left_curverad
+
+    # Create an output image to draw on and  visualize the result
+    out_img = np.dstack((img, img, img))*0
     
     # Paint the polynomial and the lane data that took us there
     lane_pts = np.hstack((left_line_window, right_line_window))
-    cv2.fillPoly(out_img, np.int_([lane_pts]), (89, 0, 89))
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [0, 255, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 255, 0]
+    cv2.fillPoly(out_img, np.int_([lane_pts]), (0, 230, 0))
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [200, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 200]
     
     # Crop the top, where most of the noise happens
     imshape = out_img.shape
     top = np.array([[(imshape[1]/4, 0), (imshape[1]/4*3, 0), (imshape[1]/4*3, imshape[0]/10), (imshape[1]/4, imshape[0]/10)]], dtype=np.int32)
     cv2.fillPoly(out_img, top, [0, 0, 0])
-    return out_img, np.array([left_fit, right_fit]), left_curverad, right_curverad
+    
+    # Calculate offset
+    offset = ((imshape[1] / 2) - ((left_base + right_base) / 2)) * xm_per_pix
+    
+    # Return results
+    return out_img, np.array([left_fit, right_fit]), left_curverad, right_curverad, offset
 
 # Plot back
 def plot_back(img, lanes):
@@ -267,7 +280,7 @@ def plot_back(img, lanes):
             (200, 700)
         ])
     M = cv2.getPerspectiveTransform(src, dst)
-    lanes = cv2.warpPerspective(lanes, M, shape, flags=cv2.INTER_LINEAR)
+    lanes = cv2.warpPerspective(lanes, M, (img.shape[0:2][1], img.shape[0:2][0]), flags=cv2.INTER_LINEAR)
     return cv2.addWeighted(img, 1, lanes, 0.8, 0)
 
 # Video processing pipeline
@@ -275,11 +288,13 @@ def pipeline(img, previously_known_polynomials):
     undist = camera_undistort(img)
     binary = double_thresholded_binary(undist)
     warped = perspective_transform(binary)
-    lanes, new_known_polynomials, left_curverad, right_curverad = lane_line_polynomials(warped, previously_known_polynomials)
+    lanes, new_known_polynomials, left_curverad, right_curverad, offset = lane_line_polynomials(warped, previously_known_polynomials)
     text = "Left curvature: " + str(left_curverad)
     cv2.putText(undist, text, (40,40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
     text = "Right curvature: " + str(right_curverad)
-    cv2.putText(undist, text, (40,90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    cv2.putText(undist, text, (40,80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    text = "Offset: " + str(offset)
+    cv2.putText(undist, text, (40,120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
     return plot_back(undist, lanes), new_known_polynomials
 
 processing_state = None # global state for the processing pipeline
