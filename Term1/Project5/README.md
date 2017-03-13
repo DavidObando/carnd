@@ -212,7 +212,76 @@ Also available for download from my [Github repository](https://github.com/David
 
 #### Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-One example lays in function `draw_labeled_bboxes`, lines 381 through 385 of the file called [`p5.py`](./p5.p5). Here, if the width or the height of the box is less than 32 pixels then we omit it:
+The main optimization done to increase the quality of the data was the fine-tunning of the parameters. Nothing else I did in this project has the same degree of impact as playing with these parameters, and with the window overlap parameter:
+```python
+color_space = 'YCrCb' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+orient = 9  # HOG orientations
+pix_per_cell = 8 # HOG pixels per cell
+cell_per_block = 2 # HOG cells per block
+hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
+spatial_size = (64, 64) # Spatial binning dimensions
+hist_bins = 16    # Number of histogram bins
+spatial_feat = True # Spatial features on or off
+hist_feat = True # Histogram features on or off
+hog_feat = True # HOG features on or off
+```
+
+That said, a second optimization done was keeping a state variable for the video pipeline, in which previous frames inform the current frame on where the heatmap might be the brightest. Give that previous frames can and will affect current frames we also must account for this when setting a value to the threshold:
+
+```python
+def pipeline(img, state, with_heat_map=False):
+    image = img.astype(np.float32)/255.
+    hot_window_list = []
+    for window_parameter_set in sliding_windows_parameter_set:
+        i_xy_window = window_parameter_set[0]
+        i_x_start_stop = window_parameter_set[1]
+        i_y_start_stop = window_parameter_set[2]
+        windows = slide_window(image, x_start_stop=i_x_start_stop, y_start_stop=i_y_start_stop,
+                        xy_window=i_xy_window, xy_overlap=(0.75, 0.75))
+
+        hot_windows = search_windows(image, windows, svc, X_scaler, color_space=color_space,
+                            spatial_size=spatial_size, hist_bins=hist_bins,
+                            orient=orient, pix_per_cell=pix_per_cell,
+                            cell_per_block=cell_per_block,
+                            hog_channel=hog_channel, spatial_feat=spatial_feat,
+                            hist_feat=hist_feat, hog_feat=hog_feat)
+        if len(hot_windows) > 0:
+            hot_window_list.append(hot_windows)
+
+    if len(hot_window_list) > 0:
+        hot_window_list = np.concatenate(hot_window_list)
+    if state is None:
+        state = [hot_window_list]
+    else:
+        state.append(hot_window_list)
+    time_window = 5
+    if len(state) > time_window:
+        state = state[1:(time_window+1)]
+    heat = np.zeros_like(img[:,:,0]).astype(np.float)
+    # Add heat to each box in box list
+    heat_score = 1
+    for frame_windows in state:
+        heat = add_heat(heat, frame_windows, heat_score)
+        #heat_score += 1
+    # Apply threshold to help remove false positives
+    heat = apply_threshold(heat, len(state)*1.5)
+    # Visualize the heatmap when displaying
+    heatmap = np.clip(heat, 0, 255)
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+    draw_img = draw_labeled_bboxes(np.copy(img), labels)
+    
+    if with_heat_map:
+        heatmap = np.uint8(heatmap / heatmap.max() * 255)
+        heatmap = np.dstack((heatmap,heatmap,heatmap))
+        draw_img[0:288, 0:512, :] = cv2.resize(heatmap, dsize=(512,288))
+    
+    return draw_img, state
+```
+
+Notice how the call to `apply_threshold` computes the threshold based on the length of the state (which is capped to be maximum 5 frames) times 1.5. This allows the previous 4 frames to add to the body of knowledge about the scene. I played with a larger time frame (up to 10), as well as with modifying the "heat score" each frame added to the heat map (older frames adding less heat) but this didn't seem to move the needle too much so I reduced the code to its basic form.
+
+One more example lays in function `draw_labeled_bboxes`, lines 381 through 385 of the file called [`p5.py`](./p5.p5). Here, if the width or the height of the box is less than 32 pixels then we omit it:
 ```python
         # Skip skinny boxes
         if (bbox[1][0] - bbox[0][0]) < 32:
