@@ -12,7 +12,7 @@ from skimage.feature import hog
 from sklearn.model_selection import train_test_split
 from scipy.ndimage.measurements import label
 from moviepy.editor import VideoFileClip
-%matplotlib inline
+
 
 # Perform a histogram of oriented gradients (HOG) feature extraction on a labeled training set of images
 
