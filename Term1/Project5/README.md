@@ -11,7 +11,18 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[calibration1]: ./output_images/camera_calibration.jpg "Calibration"
+[window1]: ./report_images/1.window32x32.png "Window definition 1"
+[window2]: ./report_images/2.window64x64.png "Window definition 2"
+[window3]: ./report_images/3.window128x128.png "Window definition 3"
+[detection1]: ./report_images/4.detection.png "Car detection"
+[detection2]: ./report_images/5.detectionwithheatmap.png "Car detection with heatmap"
+[test1]: ./report_images/6.test1.png "Test image"
+[test2]: ./report_images/7.test2.png "Test image"
+[test3]: ./report_images/8.test3.png "Test image"
+[test4]: ./report_images/9.test4.png "Test image"
+[test5]: ./report_images/10.test5.png "Test image"
+[test6]: ./report_images/11.test6.png "Test image"
+[optimization1]: ./report_images/12.optimization1.png "Optimization"
 
 ## How to run this project
 Make sure you've set up your environment as indicated by Udacity in the [CarND Term1 Starter Kit](https://github.com/udacity/CarND-Term1-Starter-Kit). Then, from a command prompt run:
@@ -93,15 +104,145 @@ After creating and training the classifier, we obtain its accuracy by calling `s
 
 #### Describe how (and identify where in your code) you implemented a sliding window search. How did you decide what scales to search and how much to overlap windows?
 
-The code for this section is contained in lines 191 through 346 of the file called [`p5.py`](./p5.p5). In specific, the following routines are declared:
+The code for this section is contained in lines 191 through 407 of the file called [`p5.py`](./p5.p5). In specific, the following routines are declared:
   * Line 191, `slide_window`: Takes an image, boundary positions on x and y, a window size, and an how much to overlap between windows on the x and y axis. Returns a set of all the windows, each window being a tuple of 2 coordinates: top-left and bottom-right.
   * Line 233, `search_windows`: akes an image, and a set of windows to focus our analysis on. For each image focused by a window, we'll extract the features (based on the same parameters used to train the classifier) and then we ask the classifier for its prediction.
+  * Line 262, `draw_boxes`: Draws squares as specified by the bounding box set.
+  * Line 352, `add_heat`: Increases the value of a region in a heatmap when a box touches the region.
+  * Line 361, `apply_threshold`: Zeroes out pixels below the specified threshold.
+  * Line 368, `draw_labeled_bboxes`: Given a set of labeled boxes and an image, we'll draw a box around each set of minimum-maximum values for a label region.
+
+All of these routines are familiar to the class as they've been defined in the class contents leading up to this project.
+
+I then proceed to generate the sliding windows parameter set. That is, which parameters will be used for different window sizes. The first parameter set I define comes in line 282. It defines a 32x32 window on a span centered around the horizon viewport:
+
+```python
+xy_window=(32, 32)
+x_start_stop = [np.int(draw_image.shape[1]*0.33), np.int(draw_image.shape[1]*0.66)]
+y_start_stop = [380, 450]
+```
+![Windows][window1]
+
+The second parameter set is in line 296, being a 64x64 window on a slightly larger area:
+
+```python
+xy_window=(64, 64)
+x_start_stop = [np.int(draw_image.shape[1]*0.1), np.int(draw_image.shape[1]*0.1*9)]
+y_start_stop = [380, 540]
+```
+![Windows][window2]
+
+The third and final parameter set is in line 310, with a 128x128 window on the largest area yet:
+
+```python
+xy_window=(128, 128)
+x_start_stop = [None, None]
+y_start_stop = [400, 600]
+```
+![Windows][window3]
+
+The images above show the grid as it would appear with zero overlap between the windows, but in the actual window search code I'm using a 75% overlap between windows in both the x and y axis. We can then detect a good number of features we're looking for, and some we aren't. From line 328:
+
+```python
+for window_parameter_set in sliding_windows_parameter_set:
+    i_xy_window = window_parameter_set[0]
+    i_x_start_stop = window_parameter_set[1]
+    i_y_start_stop = window_parameter_set[2]
+    windows = slide_window(image, x_start_stop=i_x_start_stop, y_start_stop=i_y_start_stop,
+                    xy_window=i_xy_window, xy_overlap=(0.75, 0.75))
+
+    hot_windows = search_windows(image, windows, svc, X_scaler, color_space=color_space,
+                        spatial_size=spatial_size, hist_bins=hist_bins,
+                        orient=orient, pix_per_cell=pix_per_cell,
+                        cell_per_block=cell_per_block,
+                        hog_channel=hog_channel, spatial_feat=spatial_feat,
+                        hist_feat=hist_feat, hog_feat=hog_feat)
+    if len(hot_windows) > 0:
+        hot_window_list.append(hot_windows)
+```
+
+![Detection][detection1]
+
+After this, we proceed to create a heatmap to aid in identifying properly which of these overlapping regions are more likely true positives. For that, we call functions `add_heat` with the result of the hot windows found above, and then `apply_threshold` in order to drop some of the false positives.
+
+```python
+heat = np.zeros_like(image[:,:,0]).astype(np.float)
+...
+# Add heat to each box in box list
+heat = add_heat(heat, np.concatenate(hot_window_list))
+    
+# Apply threshold to help remove false positives
+heat = apply_threshold(heat,2)
+
+# Visualize the heatmap when displaying    
+heatmap = np.clip(heat, 0, 255)
+
+# Find final boxes from heatmap using label function
+labels = label(heatmap)
+draw_img = draw_labeled_bboxes(np.copy(image), labels)
+
+heatmap = np.uint8(heatmap / heatmap.max() * 255)
+heatmap = np.dstack((heatmap,heatmap,heatmap))
+draw_img[0:288, 0:512, :] = cv2.resize(heatmap, dsize=(512,288))
+```
+
+![Detection][detection2]
 
 #### Show some examples of test images to demonstrate how your pipeline is working. How did you optimize the performance of your classifier?
+
+Here's some test images run under the processing pipeline:
+
+![Test][test1]
+![Test][test2]
+![Test][test3]
+![Test][test4]
+![Test][test5]
+![Test][test6]
+
+As you can see, the detection algorithms still show some issues. They are less relevant in the video than in the stills above given that the pipeline for the video takes into account information from previous frames in order to help inform the decision where the cars are.
 
 ### Video Implementation
 
 #### Provide a link to your final video output. Your pipeline should perform reasonably well on the entire project video (somewhat wobbly or unstable bounding boxes are ok as long as you are identifying the vehicles most of the time with minimal false positives.)
 
+Here's a video of the outcome of this code:
+  - Youtube [video](https://youtu.be/FufPayIMWHc)
+
+Also available for download from my [Github repository](https://github.com/DavidObando/carnd/tree/master/Term1/Project5). Look for file `processed_project_video.mp4`.
+
 #### Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
+One example lays in function `draw_labeled_bboxes`, lines 381 through 385 of the file called [`p5.py`](./p5.p5). Here, if the width or the height of the box is less than 32 pixels then we omit it:
+```python
+        # Skip skinny boxes
+        if (bbox[1][0] - bbox[0][0]) < 32:
+            continue
+        if (bbox[1][1] - bbox[0][1]) < 32:
+            continue
+```
+
+That optimization makes boxes that aren't really there go away, for example compare the top-left heatmap to the actual picture which correclty skips these boxes:
+
+![Optimization][optimization1]
+
+The "skip skinny boxes" values were tuned by hand, but they seem to be intutively agreeable given they measure half of the pixels used by the spatial binning feature on each dimension it works on.
+
+Another more explicit optimization was the use of smaller areas on which the windows will operate, such as:
+
+![Windows][window1]
+
+This ensures we don't go looking for cars in regions of the image where none will appear. The change between having these regions and not having them, or even only bounding on the y axis versus also bounding on the x axis, are very steep. Given that my model uses an overlap of 75% we get massive performance increases simply by doing less work.
+
+### Discussion
+
+#### Briefly discuss any problems / issues you faced in your implementation of this project. Where will your pipeline likely fail? What could you do to make it more robust?
+
+The code is far from perfect, but does achieve a workable solution on car detection. I worked very hard to reduce both the false positives and the wobbliness of the box once a car ws found, but I think in order to achieve better results I should move beyond a linar SVC. This project involved a lot of experimentation, over 20 hours were spent just in parameter tunning given that the results would vary wildly if I were to simply use a different color space and not modify the color histogram bin size. The effort was worth it, I feel like I have gotten a good grasp of how these variables interact and affect each other, and I will be able to improve this technique for image detection in the future.
+
+My pipeline still lacks robustness around false positives that sprout out of the concrete. I wasn't able to fully eliminate them without also stop detecting true positives. It appears to me that either the training data I have isn't enough, or the linear SVC model I used isn't powerful enough to linearly separate the data at hand with the configuration I've created in this project. One thing that came to mind was using more than one color space in the feature data in order to have more features to look at. Additionally, I'm thinking that replacing the linear support vector machine by a convolutional neural network might prove like a fun post-submit challenge.
+
+Finally, the performance I obtained was less than ideal. Despite some of my efforts to reduce complexity or total amount of computations performed, each frame was taking over 1 second to process, which makes this code likely unsuitable for near-real-time applications where the video feed can inform a machine on how to drive a car. I'm looking forward to learning more about how to address this issue in term 2 of the Self-driving car nanodegree program.
+
+Thank you for reading and reviewing this!
+
+David.
