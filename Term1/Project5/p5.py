@@ -10,13 +10,13 @@ from moviepy.editor import VideoFileClip
 from IPython.display import HTML
 
 # Video processing pipeline
-def pipeline(img, previously_known_polynomials):
-    pass
+def pipeline(img, state):
+    return state
 
 processing_state = None # global state for the processing pipeline
 def process_image(image):
     global processing_state 
-    result = pipeline(image, processing_state)
+    result, processing_state = pipeline(image, processing_state)
     return result
 
 # Now, let's process the video!
