@@ -129,7 +129,7 @@ def extract_features(imgs, color_space='RGB', spatial_size=(32, 32),
 
 # Load training data
 
-color_space = 'YCrCb' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+color_space = 'LUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 orient = 9  # HOG orientations
 pix_per_cell = 8 # HOG pixels per cell
 cell_per_block = 2 # HOG cells per block
@@ -442,7 +442,7 @@ def pipeline(img, state, with_heat_map=False):
         heat = add_heat(heat, frame_windows, heat_score)
         #heat_score += 1
     # Apply threshold to help remove false positives
-    heat = apply_threshold(heat, len(state)*1.5)
+    heat = apply_threshold(heat, len(state)*2)
     # Visualize the heatmap when displaying
     heatmap = np.clip(heat, 0, 255)
     # Find final boxes from heatmap using label function
