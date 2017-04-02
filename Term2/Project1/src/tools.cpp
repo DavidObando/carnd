@@ -54,9 +54,27 @@ VectorXd Tools::cartesian4ToPolar3(const VectorXd &x_state) {
 	float vx = x_state(2);
 	float vy = x_state(3);
 
+  if (fabs(px) < 0.0001) {
+    px = 0.0001;
+  }
+  if (fabs(py) < 0.0001) {
+    py = 0.0001;
+  }
+
+	float px2 = px * px;
+	float py2 = py * py;
+
+	//check division by zero
+  if (fabs(px2) < 0.0001) {
+    px2 = 0.0001;
+  }
+  if (fabs(py2) < 0.0001) {
+    py2 = 0.0001;
+  }
+
   // calculate
-  float rho = sqrt((px * px) + (py * py));
-  float phi = atan(py / px);
+  float rho = sqrt((px2) + (py2));
+  float phi = atan2(py, px);
   float rho_dot = ((px * vx) + (py * vy)) / rho;
 
   P << rho, phi, rho_dot;
@@ -69,6 +87,10 @@ VectorXd Tools::polar3ToCartesian4(const VectorXd &x_state) {
   float rho = x_state(0);
   float phi = x_state(1);
   float rho_dot = x_state(2);
+
+  if (fabs(rho) < 0.0001) {
+    rho = 0.0001;
+  }
 
   // calculate
   float px = rho * cos(phi);
@@ -88,14 +110,28 @@ MatrixXd Tools::calculateJacobian3x4(const VectorXd& x_state) {
 	float vx = x_state(2);
 	float vy = x_state(3);
 
+  if (fabs(px) < 0.0001) {
+    px = 0.0001;
+  }
+  if (fabs(py) < 0.0001) {
+    py = 0.0001;
+  }
+
 	float px2 = px * px;
 	float py2 = py * py;
 
 	//check division by zero
-	if (!px2 & !py2) {
+  if (fabs(px2) < 0.0001) {
+    px2 = 0.0001;
+  }
+  if (fabs(py2) < 0.0001) {
+    py2 = 0.0001;
+  }
+
+	/*if (!px2 & !py2) {
     cout << "Division by zero" << endl;
 	  return Hj;
-	}
+	}*/
 	
 	//compute the Jacobian matrix
 	float h00 = px / sqrt(px2 + py2);

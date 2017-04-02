@@ -32,7 +32,7 @@ void KalmanFilter::Predict() {
 void KalmanFilter::Update(const VectorXd &z) {
   VectorXd y = z - (H_ * x_);
   MatrixXd PHt = P_ * Ht_;
-  MatrixXd S = (H_ * P_ * Ht_) + R_;
+  MatrixXd S = (H_ * PHt) + R_;
   MatrixXd K = PHt * S.inverse();
   x_ = x_ + (K * y);
   P_ = (I_ - (K * H_)) * P_;
@@ -40,12 +40,6 @@ void KalmanFilter::Update(const VectorXd &z) {
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   VectorXd y = z - tools_.cartesian4ToPolar3(x_);
-  // normalize ϕ in the y vector so that its angle is between −pi and pi; in other words, add or subtract 2pi from ϕ until it is between −pi and pi.
-  if (y(1) < -M_PI) {
-    y(1) = y(1) + (2 * M_PI);
-  } else if (y(1) > M_PI) {
-    y(1) = y(1) - (2 * M_PI);
-  }
   MatrixXd Hj = tools_.calculateJacobian3x4(x_);
   MatrixXd Hjt = Hj.transpose();
   MatrixXd PHjt = P_ * Hjt;
