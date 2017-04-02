@@ -23,7 +23,17 @@ public:
   /**
   * A helper method to calculate Jacobians.
   */
-  Eigen::MatrixXd CalculateJacobian(const Eigen::VectorXd& x_state);
+  Eigen::MatrixXd calculateJacobian3x4(const Eigen::VectorXd& x_state);
+
+  /**
+  * Helper to convert cartesian(4) to polar(3); equivalent to function h in radar update EKF
+  */
+  Eigen::VectorXd cartesian4ToPolar3(const Eigen::VectorXd &x_state);
+
+  /**
+  * Helper to convert polar(3) to cartesian(4)
+  */
+  Eigen::VectorXd polar3ToCartesian4(const Eigen::VectorXd &x_state);
 
 };
 

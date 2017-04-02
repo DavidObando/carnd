@@ -1,6 +1,7 @@
 #ifndef KALMAN_FILTER_H_
 #define KALMAN_FILTER_H_
 #include "Eigen/Dense"
+#include "tools.h"
 
 class KalmanFilter {
 public:
@@ -14,14 +15,23 @@ public:
   // state transistion matrix
   Eigen::MatrixXd F_;
 
+  // transposed state transistion matrix
+  Eigen::MatrixXd Ft_;
+
   // process covariance matrix
   Eigen::MatrixXd Q_;
 
   // measurement matrix
   Eigen::MatrixXd H_;
 
+  // transposed measurement matrix
+  Eigen::MatrixXd Ht_;
+
   // measurement covariance matrix
   Eigen::MatrixXd R_;
+
+  // idempotent matrix for state vector size
+  Eigen::MatrixXd I_;
 
   /**
    * Constructor
@@ -64,6 +74,8 @@ public:
    */
   void UpdateEKF(const Eigen::VectorXd &z);
 
+private:
+  Tools tools_;
 };
 
 #endif /* KALMAN_FILTER_H_ */
