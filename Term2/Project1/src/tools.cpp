@@ -15,34 +15,23 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
                               const vector<VectorXd> &ground_truth) {
   VectorXd rmse(4);
 	rmse << 0,0,0,0;
-  // check the validity of the following inputs:
-	//  * the estimation vector size should not be zero
 	if (!estimations.size()) {
     cout << "Invalid estimation vector size" << endl;
     return rmse;
 	}
-	//  * the estimation vector size should equal ground truth vector size
 	if (estimations.size() != ground_truth.size()) {
     cout << "Estimation vector size doesn't match ground_truth vector size" << endl;
     return rmse;
 	}
-	// ... your code here
 
-	//accumulate squared residuals
 	for(int i=0; i < estimations.size(); ++i){
     VectorXd residual = estimations[i] - ground_truth[i];
 		residual = residual.array() * residual.array();
 		rmse = rmse + residual;
 	}
 
-	//calculate the mean
 	rmse = rmse / estimations.size();
-
-	//calculate the squared root
-	// ... your code here
 	rmse = rmse.array().sqrt();
-
-	//return the result
 	return rmse;
 }
 
@@ -127,11 +116,6 @@ MatrixXd Tools::calculateJacobian3x4(const VectorXd& x_state) {
   if (fabs(py2) < 0.0001) {
     py2 = 0.0001;
   }
-
-	/*if (!px2 & !py2) {
-    cout << "Division by zero" << endl;
-	  return Hj;
-	}*/
 	
 	//compute the Jacobian matrix
 	float h00 = px / sqrt(px2 + py2);

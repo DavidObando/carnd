@@ -66,26 +66,18 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
          0, 0, 0, 0,
          0, 0, 0, 0;
 
+    VectorXd cM(4);
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-      /**
-      Convert radar from polar to cartesian coordinates and initialize state.
-      */
-      VectorXd cM = tools.polar3ToCartesian4(measurement_pack.raw_measurements_);
-      cM(2) = 0;
-      cM(3) = 0;
-      ekf_.Init(cM, P, F, H_laser_, R_laser_, Q);
-    }
-    else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
-      /**
-      Initialize state.
-      */
-      VectorXd cM(4);
+      // Convert radar from polar to cartesian coordinates and initialize state.
+      cM = tools.polar3ToCartesian4(measurement_pack.raw_measurements_);
+    } else if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
       cM(0) = measurement_pack.raw_measurements_(0);
       cM(1) = measurement_pack.raw_measurements_(1);
-      cM(2) = 0;
-      cM(3) = 0;
-      ekf_.Init(cM, P, F, H_laser_, R_laser_, Q);
     }
+    // initial velocity on both axes is assumed to be zero during initialization
+    cM(2) = 0;
+    cM(3) = 0;
+    ekf_.Init(cM, P, F, H_laser_, R_laser_, Q);
 
     previous_timestamp_ = measurement_pack.timestamp_;
 
@@ -108,8 +100,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
               0, 0, 0, 1;
   ekf_.Ft_ = ekf_.F_.transpose();
   
-  float noise_ax = 8;
-  float noise_ay = 8;
+  float noise_ax = 9;
+  float noise_ay = 9;
   float dt2 = dt * dt;
   float dt3 = dt2 * dt;
   float dt4 = dt3 * dt;
