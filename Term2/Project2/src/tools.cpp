@@ -11,8 +11,8 @@ Tools::~Tools() {}
 
 VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
                               const vector<VectorXd> &ground_truth) {
-  VectorXd rmse(5);
-	rmse << 0,0,0,0,0;
+  VectorXd rmse(4);
+	rmse << 0,0,0,0;
 	if (!estimations.size()) {
     std::cout << "Invalid estimation vector size" << std::endl;
     return rmse;

@@ -98,9 +98,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
     P_ << 1, 0, 0, 0, 0,
           0, 1, 0, 0, 0,
-          0, 0, 1000, 0, 0,
-          0, 0, 0, 1000, 0,
-          0, 0, 0, 0, 1000;
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0,
+          0, 0, 0, 0, 1;
     
     time_us_ = meas_package.timestamp_;
     is_initialized_ = true;
@@ -138,9 +138,9 @@ void UKF::Prediction(double delta_t) {
   P_aug.topLeftCorner(n_x_, n_x_) = P_;
   P_aug(5,5) = std_a_ * std_a_;
   P_aug(6,6) = std_yawdd_ * std_yawdd_;
-  std::cout << "P_aug = " << P_aug << std::endl;
+  //std::cout << "P_aug = " << P_aug << std::endl;
   MatrixXd A = P_aug.llt().matrixL();
-  std::cout << "A = " << A << std::endl;
+  //std::cout << "A = " << A << std::endl;
   MatrixXd Xsig_aug = MatrixXd(n_aug_, 2 * n_aug_ + 1);
   Xsig_aug.fill(0.0);
   Xsig_aug.col(0) = x_aug;
@@ -149,7 +149,7 @@ void UKF::Prediction(double delta_t) {
     Xsig_aug.col(i + 1)          = x_aug + sqrt(lambda_ + n_aug_) * A.col(i);
     Xsig_aug.col(i + 1 + n_aug_) = x_aug - sqrt(lambda_ + n_aug_) * A.col(i);
   }
-  std::cout << "Xsig_aug = " << Xsig_aug << std::endl;
+  //std::cout << "Xsig_aug = " << Xsig_aug << std::endl;
   for (int i = 0; i < 2 * n_aug_ + 1; ++i)
   {
     double p_x = Xsig_aug(0,i);
@@ -189,7 +189,7 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(3,i) = yawp;
     Xsig_pred_(4,i) = yawdp;
   }
-  std::cout << "Xsig_pred_ = " << Xsig_pred_ << std::endl;
+  //std::cout << "Xsig_pred_ = " << Xsig_pred_ << std::endl;
   //predict state mean
   VectorXd x = VectorXd(n_x_);
   x.fill(0.0);
@@ -200,9 +200,9 @@ void UKF::Prediction(double delta_t) {
       x(h) += weights_(i) * Xsig_pred_(h,i);
     }
   }
-  std::cout << "xa = " << x_ << std::endl;
+  //std::cout << "xa = " << x_ << std::endl;
   x_ = x;
-  std::cout << "xb = " << x_ << std::endl;
+  //std::cout << "xb = " << x_ << std::endl;
   //predict state covariance matrix
   MatrixXd P = MatrixXd(n_x_, n_x_);
   P.fill(0.0);
@@ -210,7 +210,7 @@ void UKF::Prediction(double delta_t) {
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
     //angle normalization
-    /*if (x_diff(3) > M_PI)
+    if (x_diff(3) > M_PI)
     {
       double factor = x_diff(3) / (2 * M_PI);
       double newval = x_diff(3) - (2 * M_PI * floor(factor));
@@ -229,17 +229,17 @@ void UKF::Prediction(double delta_t) {
         newval += 2 * M_PI;
       }
       x_diff(3) = newval;
-    }*/
-    while (x_diff(3) > M_PI) x_diff(3) -= 2 * M_PI;
-    while (x_diff(3) <-M_PI) x_diff(3) += 2 * M_PI;
-    std::cout << "x_diff = " << x_diff << std::endl;
-    std::cout << "x_diff.transpose() = " << x_diff.transpose() << std::endl;
-    std::cout << "weights_(i) = " << weights_(i) << std::endl;
+    }
+    //while (x_diff(3) > M_PI) x_diff(3) -= 2 * M_PI;
+    //while (x_diff(3) <-M_PI) x_diff(3) += 2 * M_PI;
+    //std::cout << "x_diff = " << x_diff << std::endl;
+    //std::cout << "x_diff.transpose() = " << x_diff.transpose() << std::endl;
+    //std::cout << "weights_(i) = " << weights_(i) << std::endl;
     P += weights_(i) * x_diff * x_diff.transpose();
   }
-  std::cout << "Pa = " << P_ << std::endl;
+  //std::cout << "Pa = " << P_ << std::endl;
   P_ = P;
-  std::cout << "Pb = " << P_ << std::endl;
+  //std::cout << "Pb = " << P_ << std::endl;
   /*
   std::cout << "weights_(last) = " << weights_(2 * n_aug_) << std::endl;
   std::cout << "Xsig_pred_.col(last) = " << Xsig_pred_.col(2 * n_aug_) << std::endl;
@@ -310,12 +310,12 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   //calculate Kalman gain K;
   MatrixXd K = Tc * S.inverse();
   //update state mean and covariance matrix
-  std::cout << "x1 = " << x_ << std::endl;
+  //std::cout << "x1 = " << x_ << std::endl;
   x_ = x_ + (K * (z - z_pred));
-  std::cout << "x2 = " << x_ << std::endl;
-  std::cout << "P1 = " << P_ << std::endl;
+  //std::cout << "x2 = " << x_ << std::endl;
+  //std::cout << "P1 = " << P_ << std::endl;
   P_ = P_ - (K * S * K.transpose());
-  std::cout << "P2 = " << P_ << std::endl;
+  //std::cout << "P2 = " << P_ << std::endl;
 
   //update NIS
   VectorXd z_delta = z - z_pred;
@@ -407,7 +407,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   {
     VectorXd deltaX = Xsig_pred_.col(i) - x_;
     //angle normalization
-    /*if (deltaX(3) > M_PI)
+    if (deltaX(3) > M_PI)
     {
       double factor = deltaX(3) / (2 * M_PI);
       double newval = deltaX(3) - (2 * M_PI * floor(factor));
@@ -426,12 +426,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         newval += 2 * M_PI;
       }
       deltaX(3) = newval;
-    }*/
-    while (deltaX(3) > M_PI) deltaX(3) -= 2 * M_PI;
-    while (deltaX(3) <-M_PI) deltaX(3) += 2 * M_PI;
+    }
+    //while (deltaX(3) > M_PI) deltaX(3) -= 2 * M_PI;
+    //while (deltaX(3) <-M_PI) deltaX(3) += 2 * M_PI;
     VectorXd deltaZ = Zsig.col(i) - z_pred;
     //angle normalization
-    /*if (deltaZ(1) > M_PI)
+    if (deltaZ(1) > M_PI)
     {
       double factor = deltaZ(1) / (2 * M_PI);
       double newval = deltaZ(1) - (2 * M_PI * floor(factor));
@@ -450,9 +450,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         newval += 2 * M_PI;
       }
       deltaZ(1) = newval;
-    }*/
-    while (deltaZ(1) > M_PI) deltaZ(1) -= 2 * M_PI;
-    while (deltaZ(1) <-M_PI) deltaZ(1) += 2 * M_PI;
+    }
+    //while (deltaZ(1) > M_PI) deltaZ(1) -= 2 * M_PI;
+    //while (deltaZ(1) <-M_PI) deltaZ(1) += 2 * M_PI;
     Tc += weights_(i) * deltaX * deltaZ.transpose();
   }
   //calculate Kalman gain K;
@@ -460,7 +460,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   //update state mean and covariance matrix
   //std::cout << "x1 = " << x_ << std::endl;
   VectorXd deltaZ = z - z_pred;
-  /*if (deltaZ(1) > M_PI)
+  //angle normalization
+  if (deltaZ(1) > M_PI)
   {
     double factor = deltaZ(1) / (2 * M_PI);
     double newval = deltaZ(1) - (2 * M_PI * floor(factor));
@@ -479,9 +480,9 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
       newval += 2 * M_PI;
     }
     deltaZ(1) = newval;
-  }*/
-  while (deltaZ(1) > M_PI) deltaZ(1) -= 2 * M_PI;
-  while (deltaZ(1) <-M_PI) deltaZ(1) += 2 * M_PI;
+  }
+  //while (deltaZ(1) > M_PI) deltaZ(1) -= 2 * M_PI;
+  //while (deltaZ(1) <-M_PI) deltaZ(1) += 2 * M_PI;
   x_ = x_ + (K * (z - z_pred));
   //std::cout << "x2 = " << x_ << std::endl;
   //std::cout << "P1 = " << P_ << std::endl;
