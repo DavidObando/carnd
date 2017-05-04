@@ -48,8 +48,6 @@ UKF::UKF() {
   std_radrd_ = 0.3;
 
   is_initialized_ = false;
-  use_laser_ = true;
-  use_radar_ = true;
   n_x_ = 5;
   n_aug_ = 7;
   lambda_ = 3 - n_aug_;
