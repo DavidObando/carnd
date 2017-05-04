@@ -135,6 +135,8 @@ int main(int argc, char* argv[]) {
   // used to compute the RMSE later
   vector<VectorXd> estimations;
   vector<VectorXd> ground_truth;
+  vector<double> lidar_nis;
+  vector<double> radar_nis;
 
   // start filtering from the second frame (the speed is unknown in the first
   // frame)
@@ -179,6 +181,7 @@ int main(int argc, char* argv[]) {
 
       // NIS value
       out_file_ << ukf.NIS_laser_ << "\t";
+      lidar_nis.push_back(ukf.NIS_laser_);
 
       // output the lidar sensor measurement px and py
       out_file_ << measurement_pack_list[k].raw_measurements_(0) << "\t";
@@ -190,6 +193,7 @@ int main(int argc, char* argv[]) {
 
       // NIS value
       out_file_ << ukf.NIS_radar_ << "\t";
+      radar_nis.push_back(ukf.NIS_radar_);
 
       // output radar measurement in cartesian coordinates
       float ro = measurement_pack_list[k].raw_measurements_(0);
@@ -222,6 +226,13 @@ int main(int argc, char* argv[]) {
   // compute the accuracy (RMSE)
   Tools tools;
   cout << "RMSE" << endl << tools.CalculateRMSE(estimations, ground_truth) << endl;
+
+  std::sort(lidar_nis.begin(), lidar_nis.end());
+  std::sort(radar_nis.begin(), radar_nis.end());
+  cout << "NIS Lidar 95% = " << lidar_nis[lidar_nis.size() * 0.95] << std::endl;
+  cout << "NIS Radar 95% = " << radar_nis[radar_nis.size() * 0.95] << std::endl;
+  cout << "For reference: expected 95th percentile NIS for 2 degrees of freedom: 5.991" << std::endl;
+  cout << "For reference: expected 95th percentile NIS for 3 degrees of freedom: 7.815" << std::endl;
 
   // close files
   if (out_file_.is_open()) {

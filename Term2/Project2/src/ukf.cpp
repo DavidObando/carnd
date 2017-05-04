@@ -27,10 +27,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.5; //TODO: this is off
+  std_a_ = 0.185; // longitudinal acceleration of 0.185 means that 95% of the time we expect acceleration of -0.37 to 0.37 m/s^2
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.5; //TODO: this is off
+  std_yawdd_ = 0.25; // angular velocity of 0.25 rad/s means a full circle will complete in 8 seconds (2pi = 0.25pi rad/s * 8s)
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
