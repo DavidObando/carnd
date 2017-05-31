@@ -1,21 +1,24 @@
 #ifndef PID_H
 #define PID_H
 
+enum PIDEntry
+{
+  P = 0,
+  I = 1,
+  D = 2
+};
+
 class PID {
 public:
   /*
   * Errors
   */
-  double p_error;
-  double i_error;
-  double d_error;
+  double _error[3];
 
   /*
   * Coefficients
   */ 
-  double Kp;
-  double Ki;
-  double Kd;
+  double _K[3];
 
   /*
   * Constructor
@@ -30,7 +33,7 @@ public:
   /*
   * Initialize PID.
   */
-  void Init(double Kp, double Ki, double Kd);
+  void Init(double kp, double ki, double kd);
 
   /*
   * Update the PID error variables given cross track error.
@@ -43,12 +46,20 @@ public:
   double TotalError();
 
 private:
-  /*
-  * State
-  */
-  double _prev_cte;
-  double _diff_cte;
-  long double _int_cte;
+  long long _iterations;
+  double _cumulative_cuadratic_error;
+  double _best_error;
+  enum TwiddleState
+  {
+    Start,
+    IncreaseCheck,
+    DecreaseCheck
+  } _current_twiddle_state;
+  PIDEntry _current_twiddle_variable;
+  double _dK[3];
+  double _tolerance = 0.00005;
+  const int TwiddleBottomThreshold = 150;
+  void Twiddle();
 };
 
 #endif /* PID_H */
