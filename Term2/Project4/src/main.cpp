@@ -71,8 +71,8 @@ int main()
           } else if (steer_value > 1) {
             steer_value = 1;
           }
-          pid_throttle.UpdateError(speed - abs(cte));
-          throttle = -pid_throttle.TotalError();
+          pid_throttle.UpdateError(abs(cte));
+          throttle = (50-speed)-pid_throttle.TotalError();
           std::cout << "throttle: " << throttle << std::endl;
           if (throttle < -1) {
             throttle = -1;
