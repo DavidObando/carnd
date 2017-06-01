@@ -34,9 +34,9 @@ int main()
 
   PID pid_steer;
   PID pid_throttle;
-  double initial_kp = 0.05;
-  double initial_ki = 0.00005;
-  double initial_kd = 0.05;
+  double initial_kp = 0.1;
+  double initial_ki = 0.0004;
+  double initial_kd = 3;
   pid_steer.Init(initial_kp, initial_ki, initial_kd);
   pid_throttle.Init(initial_kp, initial_ki, initial_kd);
 
@@ -71,14 +71,15 @@ int main()
           } else if (steer_value > 1) {
             steer_value = 1;
           }
-          pid_throttle.UpdateError(abs(cte));
-          throttle = (50-speed)-pid_throttle.TotalError();
+          /*pid_throttle.UpdateError(-abs(cte) * speed);
+          throttle = 1-pid_throttle.TotalError();
           std::cout << "throttle: " << throttle << std::endl;
           if (throttle < -1) {
             throttle = -1;
           } else if (throttle > 1) {
             throttle = 1;
-          }
+          }*/
+          throttle = 0.3;
           
           // DEBUG
           std::cout << "CTE: " << cte << " Steering Value: " << steer_value << " Throttle: " << throttle << std::endl;
