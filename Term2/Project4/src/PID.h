@@ -1,8 +1,6 @@
 #ifndef PID_H
 #define PID_H
 
-#include <time.h>
-
 enum PIDEntry
 {
   P = 0,
@@ -48,7 +46,6 @@ public:
   double TotalError();
 
 private:
-  time_t _last_error_check;
   long long _iterations;
   double _cumulative_cuadratic_error;
   double _best_error;
