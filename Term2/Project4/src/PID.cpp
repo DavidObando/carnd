@@ -21,7 +21,7 @@ void PID::Init(double kp, double ki, double kd) {
     _dK[PIDEntry::I] = ki > 0.00000005 ? ki * 0.1 : 1;
     _iterations = 0;
     _best_error = std::numeric_limits<double>::max();
-    _cumulative_cuadratic_error = 0;
+    _squared_error = 0;
     _current_twiddle_state = TwiddleState::Start;
     _current_twiddle_variable = PIDEntry::D;
 }
@@ -32,7 +32,7 @@ void PID::UpdateError(double cte) {
     _error[PIDEntry::I] += cte;
     _iterations++;
     if (_iterations > TwiddleBottomThreshold) {
-        _cumulative_cuadratic_error += cte * cte;
+        _squared_error += cte * cte;
     }
 }
 
@@ -54,14 +54,14 @@ void PID::Twiddle()
         }
 
         // let's twiddle!
-        double current_error_point;
+        double current_mean_squared_error;
         switch(_current_twiddle_state) {
         case TwiddleState::Start:
             cout << "K:  [" << _K[0] << "," << _K[1] << "," << _K[2] << "]" << endl;
             cout << "dK: [" << _dK[0] << "," << _dK[1] << "," << _dK[2] << "]" << endl;
             _current_twiddle_variable = (PIDEntry)((_current_twiddle_variable + 1) % 3);
             _K[_current_twiddle_variable] += _dK[_current_twiddle_variable];
-            _cumulative_cuadratic_error = 0;
+            _squared_error = 0;
             _iterations = 0;
             _error[PIDEntry::D] = 0;
             _error[PIDEntry::P] = 0;
@@ -69,14 +69,14 @@ void PID::Twiddle()
             _current_twiddle_state = TwiddleState::IncreaseCheck;
             break;
         case TwiddleState::IncreaseCheck:
-            current_error_point = (_cumulative_cuadratic_error / _iterations);
-            if (current_error_point < _best_error) {
-                _best_error = current_error_point;
+            current_mean_squared_error = (_squared_error / _iterations);
+            if (current_mean_squared_error < _best_error) {
+                _best_error = current_mean_squared_error;
                 _dK[_current_twiddle_variable] *= 1.1;
                 _current_twiddle_state = TwiddleState::Start;
             } else {
                 _K[_current_twiddle_variable] -= 2 * _dK[_current_twiddle_variable];
-                _cumulative_cuadratic_error = 0;
+                _squared_error = 0;
                 _iterations = 0;
                 _error[PIDEntry::D] = 0;
                 _error[PIDEntry::P] = 0;
@@ -85,9 +85,9 @@ void PID::Twiddle()
             }
             break;
         case TwiddleState::DecreaseCheck:
-            current_error_point = (_cumulative_cuadratic_error / _iterations);
-            if (current_error_point < _best_error) {
-                _best_error = current_error_point;
+            current_mean_squared_error = (_squared_error / _iterations);
+            if (current_mean_squared_error < _best_error) {
+                _best_error = current_mean_squared_error;
                 _dK[_current_twiddle_variable] *= 1.1;
             } else {
                 _K[_current_twiddle_variable] += _dK[_current_twiddle_variable];

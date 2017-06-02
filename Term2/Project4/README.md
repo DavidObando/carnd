@@ -1,84 +1,79 @@
-# CarND-Controls-PID
-Self-Driving Car Engineer Nanodegree Program
+**PID Controller project**
 
----
+The goals / steps of this project are the following:
+  * Build a PID controller and tune the PID hyperparameters.
+  * Learn about the use of the crosstrack error (CTE) in a PID controller.
+  * Successfully drive the simulated vehicle.
 
-## Dependencies
+## How to run this project
+1. Ensure you have installed the dependencies.
+  * On Ubuntu 16.04, (including Bash on Ubuntu on Windows), run the `install-ubuntu.sh` script in this repository.
+2. Dependencies on other platforms:
+  * cmake: 3.5
+    * All OSes: [click here for installation instructions](https://cmake.org/install/)
+  * make: 4.1
+    * Linux: make is installed by default on most Linux distros
+    * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
+    * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
+  * gcc/g++: 5.4
+    * Linux: gcc / g++ is installed by default on most Linux distros
+    * Mac: same deal as make - [install Xcode command line tools](https://developer.apple.com/xcode/features/)
+    * Windows: recommend using [MinGW](http://www.mingw.org/)
+  * [uWebSockets](https://github.com/uWebSockets/uWebSockets)
+    * Run either `./install-mac.sh` or `./install-ubuntu.sh`.
+    * If you install from source, checkout to commit `e94b6e1`, i.e.
+      ```
+      git clone https://github.com/uWebSockets/uWebSockets
+      cd uWebSockets
+      git checkout e94b6e1
+      ```
+  * Simulator. You can download these from the [project intro page](https://github.com/udacity/self-driving-car-sim/releases) in the classroom.
+3. Make a build directory: `mkdir build && cd build`
+4. Compile: `cmake .. && make`
+   * On Windows, you may need to run: `cmake .. -G "Unix Makefiles" && make`
+5. Run it: `./pid`.
 
-* cmake >= 3.5
- * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets) == 0.13, but the master branch will probably work just fine
-  * Follow the instructions in the [uWebSockets README](https://github.com/uWebSockets/uWebSockets/blob/master/README.md) to get setup for your platform. You can download the zip of the appropriate version from the [releases page](https://github.com/uWebSockets/uWebSockets/releases). Here's a link to the [v0.13 zip](https://github.com/uWebSockets/uWebSockets/archive/v0.13.0.zip).
-  * If you run OSX and have homebrew installed you can just run the ./install-mac.sh script to install this
-* Simulator. You can download these from the [project intro page](https://github.com/udacity/CarND-PID-Control-Project/releases) in the classroom.
+## [Rubric](https://review.udacity.com/#!/rubrics/824/view) Points
 
-## Basic Build Instructions
+### Compiling
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./pid`. 
+#### Your code should compile.
+It does. It has been tested on Windows (MinGW) and Ubuntu on Windows (via the [WSL](https://msdn.microsoft.com/en-us/commandline/wsl/about)). Follow the instructions above and you should be good!
 
-## Editor Settings
+### Implementation
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+#### The PID procedure follows what was taught in the lessons.
+As instructed in the lesson, the PID exposes two main steps:
+  * Update error: takes the CTE from the current measurement and updates the PID's state.
+  * Total error: does the twiddling of the tau coeficients, and returns the computed total error.
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+The CTE affects the error state of the PID controller, which is separated by P error, I error (the integral) and D error (the derivate). The total error is the sum of the product of these errors by their corresponding tau coeficients.
 
-## Code Style
+Additionally, this PID controller behaves as a finate state automaton with respect to the twiddling of the tau coeficients. It keeps a state and runs experiments on the effect of slightly modified coeficient values, perpetually evaluating if new coeficients lead to a reduced mean squared error in the overall execution over a brief period of time.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+### Reflection
 
-## Project Instructions and Rubric
+#### Describe the effect each of the P, I, D components had in your implementation.
+After playing with the program's hyperparameters for while it's evident that:
+  * `P` plays a key role in actually reaching the center at all. If we went for a value that's too low for P, the car never becomes stable and the CTE just goes out of control. However, `P` by itself gives us only a proverbial "drunkard's path".
+  * `D` is fundamental to the sobreity of our controller. It ensures the controller reduces the CTE smoothly over time. Given that it operates on the delta of the current CTE and the previous one, the `D` hyperparameter is typically way larger than the `P` hyperparameter. In my case, it's about one order of magnitude larger.
+  * `I` is "integral" to reducing the bias that one experiences in real-world scenarios where components of the vehicle or the sensors do not respond adequately and we must compensate in order to reduce the CTE appropriately. Note that I ended up picking a very small value for `I` given this simulator doesn't really have much of a skew.
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+#### Describe how the final hyperparameters were chosen.
+The program starts with the following default hyperparameters:
+```C++
+  double initial_kp = 0.31;
+  double initial_ki = 0.00055;
+  double initial_kd = 3.85;
+```
+The hyperparameters were obtained by running this program a few times with zeroes and letting the twiddling work. The values are never static, the program updates them continually but I noticed these are okay values to start with given that they are semi stable (the program goes back to them eventually after a short while) and work well for the problem at hand.
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/e8235395-22dd-4b87-88e0-d108c5e5bbf4/concepts/6a4d8d42-6a04-4aa6-b284-1697c0fd6562)
-for instructions and the project rubric.
+### Simulation
 
-## Hints!
+#### The vehicle must successfully drive a lap around the track.
+In my machine this code successfully runs the vehile around the track. I'm running on a Surface Pro 4, Intel Core i7 @ 2.2 GHz, 16 GB RAM. 
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+### A little rant
+I'm left with the feeling that Udacity doesn't like students using Windows much. I'm curious how the student population looks with respect to machines, OS of choice, access to tools, etc.
 
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
-
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
-
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+I mainly focused on using Bash on Ubuntu on Windows given that the project included the `install-ubuntu.sh` script. That script by the way will only work on Ubuntu 16.04 LTS and more recent installs (I found out the hard way).

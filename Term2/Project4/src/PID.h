@@ -47,7 +47,7 @@ public:
 
 private:
   long long _iterations;
-  double _cumulative_cuadratic_error;
+  double _squared_error;
   double _best_error;
   enum TwiddleState
   {
