@@ -34,9 +34,9 @@ int main()
 
   PID pid_steer;
   PID pid_throttle;
-  double initial_kp = 0.1;
-  double initial_ki = 0.0004;
-  double initial_kd = 3;
+  double initial_kp = 0.25;
+  double initial_ki = 0.0005;
+  double initial_kd = 3.5;
   pid_steer.Init(initial_kp, initial_ki, initial_kd);
   pid_throttle.Init(initial_kp, initial_ki, initial_kd);
 

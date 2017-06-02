@@ -48,7 +48,7 @@ public:
   double TotalError();
 
 private:
-  clock_t _last_error_check;
+  time_t _last_error_check;
   long long _iterations;
   double _cumulative_cuadratic_error;
   double _best_error;
@@ -61,7 +61,7 @@ private:
   PIDEntry _current_twiddle_variable;
   double _dK[3];
   double _tolerance = 0.00005;
-  const int TwiddleBottomThreshold = 20;
+  const int TwiddleBottomThreshold = 50;
   void Twiddle();
 };
 

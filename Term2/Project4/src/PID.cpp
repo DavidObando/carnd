@@ -1,6 +1,8 @@
 #include "PID.h"
 #include <limits>
 #include <iostream>
+#include <math.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -15,7 +17,7 @@ void PID::Init(double kp, double ki, double kd) {
     _error[PIDEntry::D] = 0;
     _error[PIDEntry::P] = 0;
     _error[PIDEntry::I] = 0;
-    _last_error_check = clock();
+    time(&_last_error_check);
 
     _dK[PIDEntry::D] = kd > 0.00000005 ? kd * 0.1 : 1;
     _dK[PIDEntry::P] = kp > 0.00000005 ? kp * 0.1 : 1;
@@ -28,9 +30,17 @@ void PID::Init(double kp, double ki, double kd) {
 }
 
 void PID::UpdateError(double cte) {
-    clock_t now = clock();
-    float delta_t = ((float)(now - _last_error_check)) / CLOCKS_PER_SEC;
+    usleep(100);
+    time_t now;
+    time(&now);
+    double delta_t = difftime(now, _last_error_check) / 1000;
     cout << "delta_t: " << delta_t << endl;
+    if (fabs(delta_t) < 0.0000001)
+    {
+        // at least in my machine, the call to clock() often results
+        // in low-resolution data that might trigger a division by 0
+        delta_t = 1;
+    }
     _last_error_check = now;
     _error[PIDEntry::D] = (cte - _error[PIDEntry::P]) / delta_t;
     _error[PIDEntry::P] = cte;
@@ -43,6 +53,8 @@ void PID::UpdateError(double cte) {
 
 double PID::TotalError() {
     Twiddle();
+    cout << "K:  [" << _K[0] << "," << _K[1] << "," << _K[2] << "]" << endl;
+    cout << "e: [" << _error[0] << "," << _error[1] << "," << _error[2] << "]" << endl;
     return (-_K[PIDEntry::P] * _error[PIDEntry::P])
             - (_K[PIDEntry::D] * _error[PIDEntry::D])
             - (_K[PIDEntry::I] * _error[PIDEntry::I]);
@@ -50,7 +62,7 @@ double PID::TotalError() {
 
 void PID::Twiddle()
 {
-    if (_iterations > TwiddleBottomThreshold) {
+    if (_iterations > (TwiddleBottomThreshold << 1)) {
         double k_sum = (_K[PIDEntry::P] + _K[PIDEntry::D] + _K[PIDEntry::I]);
         if (k_sum > 0.0000005 && k_sum < _tolerance) {
             return;
@@ -66,9 +78,9 @@ void PID::Twiddle()
             _K[_current_twiddle_variable] += _dK[_current_twiddle_variable];
             _cumulative_cuadratic_error = 0;
             _iterations = 0;
-            //_error[PIDEntry::D] = 0;
-            //_error[PIDEntry::P] = 0;
-            //_error[PIDEntry::I] = 0;
+            _error[PIDEntry::D] = 0;
+            _error[PIDEntry::P] = 0;
+            _error[PIDEntry::I] = 0;
             _current_twiddle_state = TwiddleState::IncreaseCheck;
             break;
         case TwiddleState::IncreaseCheck:
@@ -81,9 +93,9 @@ void PID::Twiddle()
                 _K[_current_twiddle_variable] -= 2 * _dK[_current_twiddle_variable];
                 _cumulative_cuadratic_error = 0;
                 _iterations = 0;
-                //_error[PIDEntry::D] = 0;
-                //_error[PIDEntry::P] = 0;
-                //_error[PIDEntry::I] = 0;
+                _error[PIDEntry::D] = 0;
+                _error[PIDEntry::P] = 0;
+                _error[PIDEntry::I] = 0;
                 _current_twiddle_state = TwiddleState::DecreaseCheck;
             }
             break;
