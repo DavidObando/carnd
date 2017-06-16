@@ -6,8 +6,8 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 25;
-double dt = 0.1;
+size_t N = 10;
+double dt = 0.5;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -260,8 +260,23 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {solution.x[x_start + 1],   solution.x[y_start + 1],
-          solution.x[psi_start + 1], solution.x[v_start + 1],
-          solution.x[cte_start + 1], solution.x[epsi_start + 1],
-          solution.x[delta_start],   solution.x[a_start]};
+  // We'll return the following values:
+  // 0 -> the immediate steering value (in Radians)
+  // 1 -> the immediate throttle value
+  // 2 -> amount of coordinate values (N)
+  // 3 ... 3+N -> X coordinate values
+  // 3+N+1 ... 3+N+1+N -> Y coordinate values
+  vector<double> result;
+  result.push_back(solution.x[delta_start]);
+  result.push_back(solution.x[a_start]);
+  result.push_back(N);
+  for (int i = 0; i < N; ++i)
+  {
+    result.push_back(solution.x[x_start + i]);
+  }
+  for (int i = 0; i < N; ++i)
+  {
+    result.push_back(solution.x[y_start + i]);
+  }
+  return result;
 }

@@ -106,15 +106,15 @@ int main() {
           };
           std::cout << "X = " << eigenptsx << std::endl;
           std::cout << "Y = " << eigenptsy << std::endl;
-          auto coeffs = polyfit(eigenptsx, eigenptsy, 3);
+          auto coeffs = polyfit(eigenptsx, eigenptsy, 2);
           double cte = polyeval(coeffs, 0);
           double epsi = -atan(coeffs[1]);
           Eigen::VectorXd state(6);
           state << 0, 0, 0, v, cte, epsi;
           auto vars = mpc.Solve(state, coeffs);
 
-          double steer_value = vars[6] / 0.436332;
-          double throttle_value = vars[7];
+          double steer_value = vars[0] / 0.436332;
+          double throttle_value = vars[1];
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -122,9 +122,15 @@ int main() {
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
-          //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals = {vars[0]};
-          vector<double> mpc_y_vals = {vars[1]};
+          //Display the MPC predicted trajectory
+          double n = vars[2];
+          vector<double> mpc_x_vals;
+          vector<double> mpc_y_vals;
+          for (int i = 0; i < n; ++i)
+          {
+            mpc_x_vals.push_back(vars[3 + i]);
+            mpc_y_vals.push_back(vars[3 + n + i]);
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
