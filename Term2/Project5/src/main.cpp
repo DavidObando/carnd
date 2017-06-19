@@ -91,6 +91,8 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
+          //double steering_angle = j[1]["steering_angle"];
+          //double throttle = j[1]["throttle"];
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -101,19 +103,25 @@ int main() {
           Eigen::VectorXd eigenptsx(ptsx.size());
           Eigen::VectorXd eigenptsy(ptsy.size());
           for (int i = 0; i < ptsx.size(); i++) {
-              eigenptsx[i] = ((ptsx[i] - px) * cos(-psi)) - ((ptsy[i] - py) * sin(-psi));
-              eigenptsy[i] = ((ptsx[i] - px) * sin(-psi)) + ((ptsy[i] - py) * cos(-psi));
+            double global_x = ptsx[i];
+            double global_y = ptsy[i];
+            eigenptsx[i] = ptsx[i] = ((global_x - px) * cos(-psi)) - ((global_y - py) * sin(-psi));
+            eigenptsy[i] = ptsy[i] = ((global_x - px) * sin(-psi)) + ((global_y - py) * cos(-psi));
           };
-          std::cout << "X = " << eigenptsx << std::endl;
-          std::cout << "Y = " << eigenptsy << std::endl;
-          auto coeffs = polyfit(eigenptsx, eigenptsy, 2);
+          auto coeffs = polyfit(eigenptsx, eigenptsy, 3);
           double cte = polyeval(coeffs, 0);
           double epsi = -atan(coeffs[1]);
           Eigen::VectorXd state(6);
-          state << 0, 0, 0, v, cte, epsi;
+
+          // we want to predict the trajectory in a future state, so let's assume a future
+          // state to begin with
+          int when = 1000; //ms
+          double future_x = when * v / 3600000; //mph to miles per second
+
+          state << future_x, 0, 0, v, cte, epsi;
           auto vars = mpc.Solve(state, coeffs);
 
-          double steer_value = vars[0] / 0.436332;
+          double steer_value = -vars[0] / 0.436332;
           double throttle_value = vars[1];
 
           json msgJson;
