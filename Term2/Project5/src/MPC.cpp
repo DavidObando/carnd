@@ -40,8 +40,6 @@ class FG_eval {
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
     // `fg` a vector of the cost constraints, `vars` is a vector of variable values (state & actuators)
-    // NOTE: You'll probably go back and forth between this function and
-    // the Solver function below.
 
     // The cost is stored is the first element of `fg`.
     // Any additions to the cost should be added to `fg[0]`.
@@ -53,7 +51,6 @@ class FG_eval {
       fg[0] += 0.5 * CppAD::pow(vars[cte_start + t], 2);
       fg[0] += 5 * CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
-      //fg[0] += 0.01 * CppAD::pow(t * vars[v_start + t] * vars[psi_start + t], 2);
     }
 
     // Minimize the use of actuators.
@@ -109,7 +106,6 @@ class FG_eval {
       AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0 + coeffs[3] * x0 * x0 * x0;
       AD<double> psides0 = CppAD::atan(coeffs[1] + (2 * coeffs[2] * x0) + (3 * coeffs[3] * (x0*x0)));
 
-      // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
       //
       // Recall the equations for the model:

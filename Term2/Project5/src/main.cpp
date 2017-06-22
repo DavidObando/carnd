@@ -105,9 +105,8 @@ int main() {
           double epsi = -atan(coeffs[1]);
           Eigen::VectorXd state(6);
 
-
-          // we want to predict the trajectory in a future state, so let's assume a future
-          // state to begin with
+          // I wanted to predict the trajectory in a future state, and used this to assume a
+          // future position before using the MPC solver.
           // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
           // y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
           // psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
@@ -116,7 +115,7 @@ int main() {
           // epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
           double steering_angle = j[1]["steering_angle"];
           double throttle = j[1]["throttle"];
-          const double latency = 0.1; //seconds
+          const double latency = 0.1; //100 milliseconds
           const double Lf = 2.67;
           double velocity_seconds = v * 0.44704; //mph to meters per second
           double future_move = velocity_seconds * latency;
@@ -126,10 +125,9 @@ int main() {
           double future_v = v + (throttle * latency);
           double future_cte = cte + (velocity_seconds * sin(epsi) * latency);
           double future_epsi = epsi + future_psi;
-
           state << future_x, future_y, future_psi, future_v, future_cte, future_epsi;
-
-          //state << 0, 0, 0, v, cte, epsi;
+          // The above code replaces this line, which would work well assuming no latency:
+          // state << 0, 0, 0, v, cte, epsi;
           auto vars = mpc.Solve(state, coeffs);
 
           double steer_value = -vars[0] / 0.436332; // normalize to [-1,1], source is in radians [-0.436332,0.436332]
