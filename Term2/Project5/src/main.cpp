@@ -91,15 +91,7 @@ int main() {
           double py = j[1]["y"];
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
-          //double steering_angle = j[1]["steering_angle"];
-          //double throttle = j[1]["throttle"];
 
-          /*
-          * TODO: Calculate steering angle and throttle using MPC.
-          *
-          * Both are in between [-1, 1].
-          *
-          */
           Eigen::VectorXd eigenptsx(ptsx.size());
           Eigen::VectorXd eigenptsy(ptsy.size());
           for (int i = 0; i < ptsx.size(); i++) {
@@ -113,20 +105,39 @@ int main() {
           double epsi = -atan(coeffs[1]);
           Eigen::VectorXd state(6);
 
+
           // we want to predict the trajectory in a future state, so let's assume a future
           // state to begin with
-          int when = 1000; //ms
-          double future_x = when * v / 3600000; //mph to miles per second
+          // x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+          // y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+          // psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+          // v_[t+1] = v[t] + a[t] * dt
+          // cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
+          // epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+          double steering_angle = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+          const double latency = 0.1; //seconds
+          const double Lf = 2.67;
+          double velocity_seconds = v * 0.44704; //mph to meters per second
+          double future_move = velocity_seconds * latency;
+          double future_x = future_move; // we're assuming psi to be zero, so all the move will be in x
+          double future_y = 0;
+          double future_psi = velocity_seconds / Lf * deg2rad(steering_angle) * latency;
+          double future_v = v + (throttle * latency);
+          double future_cte = cte + (velocity_seconds * sin(epsi) * latency);
+          double future_epsi = epsi + future_psi;
 
-          state << future_x, 0, 0, v, cte, epsi;
+          state << future_x, future_y, future_psi, future_v, future_cte, future_epsi;
+
+          //state << 0, 0, 0, v, cte, epsi;
           auto vars = mpc.Solve(state, coeffs);
 
-          double steer_value = -vars[0] / 0.436332;
+          double steer_value = -vars[0] / 0.436332; // normalize to [-1,1], source is in radians [-0.436332,0.436332]
           double throttle_value = vars[1];
+          std::cout << "Reported steering   = " << vars[0] << std::endl;
+          std::cout << "Normalized steering = " << steer_value << std::endl;
 
           json msgJson;
-          // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
-          // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
           msgJson["steering_angle"] = steer_value;
           msgJson["throttle"] = throttle_value;
 
@@ -165,9 +176,6 @@ int main() {
           //
           // Feel free to play around with this value but should be to drive
           // around the track with 100ms latency.
-          //
-          // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
-          // SUBMITTING.
           this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
