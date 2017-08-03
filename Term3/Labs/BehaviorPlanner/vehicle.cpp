@@ -6,6 +6,8 @@
 
 #include "vehicle.h"
 
+using namespace std;
+
 /**
  * Initializes Vehicle
  */
@@ -22,11 +24,14 @@ Vehicle::~Vehicle() {}
 
 double Vehicle::calculate_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions)
 {
-    /*auto trajectory_data = get_helper_data(trajectory, predictions);
+    auto trajectory_data = get_helper_data(trajectory, predictions);
     double cost = 0.0;
     cost += distance_from_goal_lane(trajectory, predictions, trajectory_data);
-    return cost;*/
-    return 0.0;
+    cost += inefficiency_cost(trajectory, predictions, trajectory_data);
+    cost += collision_cost(trajectory, predictions, trajectory_data);
+    cost += buffer_cost(trajectory, predictions, trajectory_data);
+    cost += change_lane_cost(trajectory, predictions, trajectory_data);
+    return cost;
 }
 
 TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions)
@@ -130,6 +135,56 @@ double Vehicle::distance_from_goal_lane(vector<Vehicle> trajectory, map<int,vect
     return multiplier * REACH_GOAL;
 }
 
+double Vehicle::inefficiency_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data)
+{
+    double diff = this->target_speed - data.avg_speed;
+    double pct = diff / this->target_speed;
+    double multiplier = pow(pct, 2);
+    return multiplier * EFFICIENCY;
+}
+
+double Vehicle::collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data)
+{
+    if (data.collides != -1)
+    {
+        double exponent = pow(data.collides, 2);
+        double multiplier = exp(-exponent);
+        return multiplier * COLLISION;
+    }
+    return 0;
+}
+
+double Vehicle::buffer_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data)
+{
+    if (data.closest_approach == 0)
+    {
+        return 10 * DANGER;
+    }
+    double timesteps_away = double(data.closest_approach) / data.avg_speed;
+    if (timesteps_away > DESIRED_BUFFER)
+    {
+        return 0;
+    }
+    double multiplier = 1.0 - pow((timesteps_away / DESIRED_BUFFER), 2);
+    return multiplier * DANGER;
+}
+
+double Vehicle::change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data)
+{
+    // Penalizes lane changes AWAY from the goal lane and rewards
+    // lane changes TOWARDS the goal lane.
+    double cost = 0.0;
+    if (data.end_lanes_from_goal > trajectory[0].lane)
+    {
+        cost = COMFORT;
+    }
+    else if (data.end_lanes_from_goal < trajectory[0].lane)
+    {
+        cost = -COMFORT;
+    }
+    return cost;
+}
+
 void Vehicle::update_state(map<int,vector < vector<int> > > predictions) {
     /*
     Updates the "state" of the vehicle by assigning one of the
@@ -165,13 +220,13 @@ void Vehicle::update_state(map<int,vector < vector<int> > > predictions) {
 
     */
     vector<string> states = {"KL"};
-    if (lane > 0)
-    {
-        states.push_back("LCL");
-    }
-    if (lane < lanes_available - 1)
+    if (this->lane > 0)
     {
         states.push_back("LCR");
+    }
+    if (this->lane < (this->lanes_available - 1))
+    {
+        states.push_back("LCL");
     }
     map<int,vector<vector<int>>> pred_copy;
     for (auto p = predictions.begin(); p != predictions.end(); ++p)
@@ -296,7 +351,6 @@ Vehicle::collider Vehicle::will_collide_with(Vehicle other, int timesteps) {
 }
 
 void Vehicle::realize_state(map<int,vector < vector<int> > > predictions) {
-
     /*
     Given a state, realize it by adjusting acceleration and lane.
     Note - lane changes happen instantaneously.
@@ -326,7 +380,6 @@ void Vehicle::realize_state(map<int,vector < vector<int> > > predictions) {
     {
         realize_prep_lane_change(predictions, "R");
     }
-
 }
 
 void Vehicle::realize_constant_speed() {

@@ -113,8 +113,13 @@ public:
     map<int,vector<vector<int>>> filter_predictions_by_lane(map<int,vector<vector<int>>> predictions, int lane);
     bool check_collision(Vehicle snapshot, int s_previous, int s_now);
     double distance_from_goal_lane(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
+    double inefficiency_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
+    double collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
+    double buffer_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
+    double change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
 
 private:
+    static const int DESIRED_BUFFER = 1.5; // timesteps
     static const int PLANNING_HORIZON = 2;
 
     static const long long COLLISION  = pow(10, 6);
