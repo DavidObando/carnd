@@ -8,6 +8,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+#include "spline.h"
 
 using namespace std;
 
@@ -196,6 +197,12 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
+  // the lane we'll want to be in
+  int lane = 1;
+
+  // the velocity we'll aim at, gets updated based on environment
+  double ref_vel = 0.0;
+
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -215,38 +222,78 @@ int main() {
         if (event == "telemetry") {
           // j[1] is the data JSON object
           
-        	// Main car's localization Data
-          	double car_x = j[1]["x"];
-          	double car_y = j[1]["y"];
-          	double car_s = j[1]["s"];
-          	double car_d = j[1]["d"];
-          	double car_yaw = j[1]["yaw"];
-          	double car_speed = j[1]["speed"];
+			// Main car's localization Data
+			double car_x = j[1]["x"];
+			double car_y = j[1]["y"];
+			double car_s = j[1]["s"];
+			double car_d = j[1]["d"];
+			double car_yaw = j[1]["yaw"];
+			double car_speed = j[1]["speed"];
 
-          	// Previous path data given to the Planner
-          	auto previous_path_x = j[1]["previous_path_x"];
-          	auto previous_path_y = j[1]["previous_path_y"];
-          	// Previous path's end s and d values 
-          	double end_path_s = j[1]["end_path_s"];
-          	double end_path_d = j[1]["end_path_d"];
+			// Previous path data given to the Planner
+			auto previous_path_x = j[1]["previous_path_x"];
+			auto previous_path_y = j[1]["previous_path_y"];
+			// Previous path's end s and d values 
+			double end_path_s = j[1]["end_path_s"];
+			double end_path_d = j[1]["end_path_d"];
 
-          	// Sensor Fusion Data, a list of all other cars on the same side of the road.
-          	auto sensor_fusion = j[1]["sensor_fusion"];
+			// Sensor Fusion Data, a list of all other cars on the same side of the road.
+			auto sensor_fusion = j[1]["sensor_fusion"];
 
-          	json msgJson;
+			double prev_size = previous_path_x.size();
 
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
+			vector<double> ptsx;
+			vector<double> ptsy;
+
+			// reference x, y, yaw states
+			double ref_x = car_x;
+			double ref_y = car_y;
+			double ref_yaw = deg2rad(car_yaw);
+
+			// if the previous state is almost empty, use the car as starting reference
+			if (prev_size < 2)
+			{
+				// use two points that make the path tangent to the car
+				double prev_car_x = car_x - cos(car_yaw);
+				double prev_car_y = car_y - sin(car_yaw);
+
+				ptsx.push_back(prev_car_x);
+				ptsx.push_back(car_x);
+				ptsy.push_back(prev_car_y);
+				ptsy.push_back(car_y);
+			}
+			// use the previous path's end point as starting reference
+			else
+			{
+				//Redefine reference state as previous path end point
+				ref_x = previous_path_x[prev_size - 1];
+				ref_y = previous_path_y[prev_size - 1];
+
+				double ref_x_prev = previous_path_x[prev_size - 2];
+				double ref_y_prev = previous_path_y[prev_size - 2];
+				ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+
+				//Use two points that make the path tangent to the previous path's end point
+				ptsx.push_back(ref_x_prev);
+				ptsx.push_back(ref_x);
+				ptsy.push_back(ref_y_prev);
+				ptsy.push_back(ref_y);
+			}
+
+			json msgJson;
+
+			vector<double> next_x_vals;
+			vector<double> next_y_vals;
 
 
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-          	msgJson["next_x"] = next_x_vals;
-          	msgJson["next_y"] = next_y_vals;
+			// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+			msgJson["next_x"] = next_x_vals;
+			msgJson["next_y"] = next_y_vals;
 
-          	auto msg = "42[\"control\","+ msgJson.dump()+"]";
+			auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
-          	//this_thread::sleep_for(chrono::milliseconds(1000));
-          	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+			//this_thread::sleep_for(chrono::milliseconds(1000));
+			ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           
         }
       } else {
