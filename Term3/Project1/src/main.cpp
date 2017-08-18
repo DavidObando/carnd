@@ -2,6 +2,7 @@
 #include <math.h>
 #include <uWS/uWS.h>
 #include <chrono>
+#include <ctime>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -9,6 +10,7 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 #include "spline.h"
+#include "vehicle.h"
 
 using namespace std;
 
@@ -198,13 +200,16 @@ int main()
         map_waypoints_dy.push_back(d_y);
     }
 
-    // the lane we'll want to be in
-    int lane = 1;
-
     // the velocity we'll aim at, gets updated based on environment
-    double ref_vel = 0.0;
+    double target_vel = 49.85;
 
-    h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &lane, &ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+    map<int, Vehicle> other_vehicles;
+    Vehicle ego(1, 0, 0.1, 0);
+    ego.last_update = std::chrono::system_clock::now();
+    ego.configure(target_vel, 3, 0.224, 1, 100);
+
+    h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
+        (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
         // The 2 signifies a websocket event
@@ -214,6 +219,7 @@ int main()
         {
 
             auto s = hasData(data);
+            auto right_now = std::chrono::system_clock::now();
 
             if (s != "")
             {
@@ -257,7 +263,7 @@ int main()
                     {
                         // car is in my lane
                         float d = sensor_fusion[i][6];
-                        if (d >= (4 * lane) && d <= ((4 * lane) + 4))
+                        if (d >= (4 * ego.lane) && d <= ((4 * ego.lane) + 4))
                         {
                             double vx = sensor_fusion[i][3];
                             double vy = sensor_fusion[i][4];
@@ -276,12 +282,70 @@ int main()
 
                     if (too_close)
                     {
-                        ref_vel -= .224;
+                        ego.a -= .224;
                     }
-                    else if (ref_vel < 49.5)
+                    else if (car_speed < 49.5)
                     {
-                        ref_vel += .224;
+                        ego.a += .224;
                     }
+                    else
+                    {
+                        ego.a = 0;
+                    }
+                    std::chrono::duration<double> egodt = right_now - ego.last_update;
+                    double desired_v = car_speed + ego.a * egodt.count();
+
+                    // update car map
+                    map<int, vector<vector<double>>> predictions;
+                    for (int i = 0; i < sensor_fusion.size(); ++i)
+                    {
+                        int check_car_id = sensor_fusion[i][0];
+                        double check_car_vx = sensor_fusion[i][3];
+                        double check_car_vy = sensor_fusion[i][4];
+                        double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
+                        double check_car_s = sensor_fusion[i][5];
+                        float check_car_d = sensor_fusion[i][6];
+                        map<int, Vehicle>::iterator it;
+                        if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
+                        {
+                            auto delta_t = (right_now - it->second.last_update).count();
+                            if (delta_t <= 5.0)
+                            {
+                                // we saw this dude less than 5 seconds ago, so use it
+                                it->second.a = (check_car_v - it->second.v) / delta_t;
+                            }
+                            it->second.v = check_car_v;
+                            it->second.s = check_car_s;
+                            it->second.lane = check_car_d;
+                            // refresh instance in cache
+                            it->second.last_update = right_now;
+                            predictions[check_car_id] = it->second.generate_predictions(10);
+                        }
+                        else
+                        {
+                            Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
+                            check_car.last_update = right_now;
+                            other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
+                            predictions[check_car_id] = it->second.generate_predictions(10);
+                        }
+                    }
+                    // clean up the car cache
+                    for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
+                    {
+                        auto delta_t = (right_now - it->second.last_update).count();
+                        if (delta_t > 5.0)
+                        {
+                            // purge
+                            other_vehicles.erase(it->first);
+                        }
+                    }
+                    ego.a = (desired_v - ego.v) / (right_now - ego.last_update).count();
+                    ego.s = car_s;
+                    ego.v = desired_v;
+                    ego.last_update = right_now;
+                    predictions[-1] = ego.generate_predictions(10);
+                    //ego.update_state(predictions);
+                    //ego.realize_state(predictions);
 
                     vector<double> ptsx;
                     vector<double> ptsy;
@@ -322,9 +386,9 @@ int main()
                     }
 
                     // In Frenet, add evenly 30m spaced points ahead of the starting reference
-                    vector<double> next_wp0 = getXY(car_s + 30, (2 + (4 * lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                    vector<double> next_wp1 = getXY(car_s + 60, (2 + (4 * lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                    vector<double> next_wp2 = getXY(car_s + 90, (2 + (4 * lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                    vector<double> next_wp0 = getXY(car_s + 30, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                    vector<double> next_wp1 = getXY(car_s + 60, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                    vector<double> next_wp2 = getXY(car_s + 90, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
                     ptsx.push_back(next_wp0[0]);
                     ptsx.push_back(next_wp1[0]);
@@ -366,7 +430,11 @@ int main()
                     double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
                     double x_add_on = 0.0;
-                    double N = target_dist / ((ref_vel / 2.24) * 0.02);
+                    double div = (ego.v / 2.24) * 0.02;
+                    if (fabs(div) < 0.0001) {
+                        div = 0.0001;
+                    }
+                    double N = target_dist / div;
 
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
                     for (int i = 1; i <= 50 - previous_path_x.size(); ++i)
