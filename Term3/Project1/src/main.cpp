@@ -280,28 +280,24 @@ int main()
                         }
                     }
 
+                    std::chrono::duration<double> egodt = right_now - ego.last_update;
+                    ego.v = car_speed + (ego.a * egodt.count());
                     if (too_close)
                     {
-                        ego.a -= 0.5;
+                        ego.v -= .224 / egodt.count();
                     }
                     else if (car_speed < 48.5)
                     {
-                        ego.a += 0.5;
+                        ego.v += .224 / egodt.count();
                     }
-                    else
+                    if (ego.v > 49.5)
                     {
-                        ego.a = 0;
+                        ego.v = 49.5;
                     }
-                    std::chrono::duration<double> egodt = right_now - ego.last_update;
-                    double new_velocity = car_speed + (ego.a * egodt.count());
-                    if (new_velocity > 49.5)
-                    {
-                        new_velocity = 49.5;
-                    }
-                    ego.v = new_velocity;
+                    ego.a = (ego.v - car_speed) / ((right_now - ego.last_update).count());
                     ego.s = car_s;
                     ego.last_update = right_now;
-                    std::cout << "Car speed: " << new_velocity << std::endl;
+                    std::cout << "Egp speed: " << ego.v << std::endl;
                     std::cout << "Ego acceleration: " << ego.a << std::endl;
                     std::cout << "Ego DT: " << egodt.count() << std::endl;
 
@@ -425,12 +421,15 @@ int main()
                     vector<double> next_y_vals;
 
                     // Start with previous path points from last time
-                    int previous_points_used = (previous_path_x.size() > 10) ? 10 : previous_path_x.size();
+                    int previous_points_used = (previous_path_x.size() > 50) ? 50 : previous_path_x.size();
                     //int previous_points_used = previous_path_x.size();
-                    for (int i = 1; i <= previous_points_used; ++i)
+                    for (int i = 0; i < previous_path_x.size(); ++i)
                     {
-                        next_x_vals.push_back(previous_path_x[previous_path_x.size() - i]);
-                        next_y_vals.push_back(previous_path_y[previous_path_x.size() - i]);
+                        /*std::cout << "point[" << i << "] = {"
+                            << previous_path_x[i] << ","
+                            << previous_path_y[i] << "}" << std::endl;*/
+                        next_x_vals.push_back(previous_path_x[i]);
+                        next_y_vals.push_back(previous_path_y[i]);
                     }
 
                     // Calculate how to break up spline points so that we travel at our desired reference velocity
@@ -450,7 +449,7 @@ int main()
                     std::cout << "N: " << N << std::endl;
 
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
-                    for (int i = 1; i <= (50 - previous_points_used); ++i)
+                    for (int i = 1; i <= (50 - previous_path_x.size()); ++i)
                     {
                         double x_point = x_add_on + (target_x / N);
                         double y_point = s(x_point);
