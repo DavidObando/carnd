@@ -282,18 +282,28 @@ int main()
 
                     if (too_close)
                     {
-                        ego.a -= .224;
+                        ego.a -= 0.5;
                     }
-                    else if (car_speed < 49.5)
+                    else if (car_speed < 48.5)
                     {
-                        ego.a += .224;
+                        ego.a += 0.5;
                     }
                     else
                     {
                         ego.a = 0;
                     }
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
-                    double desired_v = car_speed + ego.a * egodt.count();
+                    double new_velocity = car_speed + (ego.a * egodt.count());
+                    if (new_velocity > 49.5)
+                    {
+                        new_velocity = 49.5;
+                    }
+                    ego.v = new_velocity;
+                    ego.s = car_s;
+                    ego.last_update = right_now;
+                    std::cout << "Car speed: " << new_velocity << std::endl;
+                    std::cout << "Ego acceleration: " << ego.a << std::endl;
+                    std::cout << "Ego DT: " << egodt.count() << std::endl;
 
                     // update car map
                     map<int, vector<vector<double>>> predictions;
@@ -339,10 +349,7 @@ int main()
                             other_vehicles.erase(it->first);
                         }
                     }
-                    ego.a = (desired_v - ego.v) / (right_now - ego.last_update).count();
-                    ego.s = car_s;
-                    ego.v = desired_v;
-                    ego.last_update = right_now;
+
                     predictions[-1] = ego.generate_predictions(10);
                     //ego.update_state(predictions);
                     //ego.realize_state(predictions);
@@ -417,11 +424,13 @@ int main()
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
 
-                    // Start with all of the previous path points from last time
-                    for (int i = 0; i < previous_path_x.size(); ++i)
+                    // Start with previous path points from last time
+                    int previous_points_used = (previous_path_x.size() > 10) ? 10 : previous_path_x.size();
+                    //int previous_points_used = previous_path_x.size();
+                    for (int i = 1; i <= previous_points_used; ++i)
                     {
-                        next_x_vals.push_back(previous_path_x[i]);
-                        next_y_vals.push_back(previous_path_y[i]);
+                        next_x_vals.push_back(previous_path_x[previous_path_x.size() - i]);
+                        next_y_vals.push_back(previous_path_y[previous_path_x.size() - i]);
                     }
 
                     // Calculate how to break up spline points so that we travel at our desired reference velocity
@@ -435,9 +444,13 @@ int main()
                         div = 0.0001;
                     }
                     double N = target_dist / div;
+                    std::cout << "target_x: " << target_x << std::endl;
+                    std::cout << "target_y: " << target_y << std::endl;
+                    std::cout << "target_dist: " << target_dist << std::endl;
+                    std::cout << "N: " << N << std::endl;
 
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
-                    for (int i = 1; i <= 50 - previous_path_x.size(); ++i)
+                    for (int i = 1; i <= (50 - previous_points_used); ++i)
                     {
                         double x_point = x_add_on + (target_x / N);
                         double y_point = s(x_point);
