@@ -284,20 +284,24 @@ int main()
                     ego.v = car_speed + (ego.a * egodt.count());
                     if (too_close)
                     {
-                        ego.v -= .224 / egodt.count();
+                        ego.v -= 4.224; // egodt.count();
                     }
                     else if (car_speed < 48.5)
                     {
-                        ego.v += .224 / egodt.count();
+                        ego.v += 4.224; // egodt.count();
                     }
-                    if (ego.v > 49.5)
+                    ego.a = (ego.v - car_speed) / ((right_now - ego.last_update).count());
+                    if (ego.v < 0)
+                    {
+                        ego.v = 0.0;
+                    }
+                    else if (ego.v > 49.5)
                     {
                         ego.v = 49.5;
                     }
-                    ego.a = (ego.v - car_speed) / ((right_now - ego.last_update).count());
                     ego.s = car_s;
                     ego.last_update = right_now;
-                    std::cout << "Egp speed: " << ego.v << std::endl;
+                    std::cout << "Ego speed: " << ego.v << std::endl;
                     std::cout << "Ego acceleration: " << ego.a << std::endl;
                     std::cout << "Ego DT: " << egodt.count() << std::endl;
 
@@ -422,8 +426,7 @@ int main()
 
                     // Start with previous path points from last time
                     int previous_points_used = (previous_path_x.size() > 50) ? 50 : previous_path_x.size();
-                    //int previous_points_used = previous_path_x.size();
-                    for (int i = 0; i < previous_path_x.size(); ++i)
+                    for (int i = 0; i < previous_points_used; ++i)
                     {
                         /*std::cout << "point[" << i << "] = {"
                             << previous_path_x[i] << ","
@@ -437,24 +440,22 @@ int main()
                     double target_y = s(target_x);
                     double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
-                    double x_add_on = 0.0;
                     double div = (ego.v / 2.24) * 0.02;
-                    if (fabs(div) < 0.0001) {
-                        div = 0.0001;
-                    }
-                    double N = target_dist / div;
+                    double N = fabs(div) > 0.01 ? target_dist / div : 3000.0;
                     std::cout << "target_x: " << target_x << std::endl;
                     std::cout << "target_y: " << target_y << std::endl;
                     std::cout << "target_dist: " << target_dist << std::endl;
                     std::cout << "N: " << N << std::endl;
 
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
-                    for (int i = 1; i <= (50 - previous_path_x.size()); ++i)
+                    double frenet_x_point = 0.0;
+                    double x_add_on = target_x / N;
+                    for (int i = 1; i <= (50 - previous_points_used); ++i)
                     {
-                        double x_point = x_add_on + (target_x / N);
+                        double x_point = frenet_x_point + x_add_on;
                         double y_point = s(x_point);
 
-                        x_add_on = x_point;
+                        frenet_x_point += x_add_on;
 
                         double x_ref = x_point;
                         double y_ref = y_point;
