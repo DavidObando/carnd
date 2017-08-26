@@ -281,29 +281,28 @@ int main()
                     }
 
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
-                    ego.v = car_speed + (ego.a * egodt.count());
                     if (too_close)
                     {
-                        ego.v -= 4.224; // egodt.count();
+                        ego.v -= .224;
                     }
-                    else if (car_speed < 48.5)
+                    else if (ego.v < 49.5)
                     {
-                        ego.v += 4.224; // egodt.count();
+                        ego.v += .224;
                     }
                     ego.a = (ego.v - car_speed) / ((right_now - ego.last_update).count());
-                    if (ego.v < 0)
+                    /*if (ego.v < 0)
                     {
                         ego.v = 0.0;
                     }
                     else if (ego.v > 49.5)
                     {
                         ego.v = 49.5;
-                    }
+                    }*/
                     ego.s = car_s;
                     ego.last_update = right_now;
-                    std::cout << "Ego speed: " << ego.v << std::endl;
+                    /*std::cout << "Ego speed: " << ego.v << std::endl;
                     std::cout << "Ego acceleration: " << ego.a << std::endl;
-                    std::cout << "Ego DT: " << egodt.count() << std::endl;
+                    std::cout << "Ego DT: " << egodt.count() << std::endl;*/
 
                     // update car map
                     map<int, vector<vector<double>>> predictions;
@@ -322,6 +321,7 @@ int main()
                             if (delta_t <= 5.0)
                             {
                                 // we saw this dude less than 5 seconds ago, so use it
+                                // to calculate its current acceleration
                                 it->second.a = (check_car_v - it->second.v) / delta_t;
                             }
                             it->second.v = check_car_v;
@@ -336,7 +336,7 @@ int main()
                             Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
                             check_car.last_update = right_now;
                             other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
-                            predictions[check_car_id] = it->second.generate_predictions(10);
+                            predictions[check_car_id] = check_car.generate_predictions(10);
                         }
                     }
                     // clean up the car cache
@@ -351,8 +351,8 @@ int main()
                     }
 
                     predictions[-1] = ego.generate_predictions(10);
-                    //ego.update_state(predictions);
-                    //ego.realize_state(predictions);
+                    ego.update_state(predictions);
+                    ego.realize_state(predictions);
 
                     vector<double> ptsx;
                     vector<double> ptsy;
@@ -361,6 +361,8 @@ int main()
                     double ref_x = car_x;
                     double ref_y = car_y;
                     double ref_yaw = deg2rad(car_yaw);
+
+                    int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20); 
 
                     // if the previous state is almost empty, use the car as starting reference
                     if (prev_size < 2)
@@ -393,16 +395,16 @@ int main()
                     }
 
                     // In Frenet, add evenly 30m spaced points ahead of the starting reference
-                    vector<double> next_wp0 = getXY(car_s + 30, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                    vector<double> next_wp1 = getXY(car_s + 60, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                    vector<double> next_wp2 = getXY(car_s + 90, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-
-                    ptsx.push_back(next_wp0[0]);
-                    ptsx.push_back(next_wp1[0]);
-                    ptsx.push_back(next_wp2[0]);
-                    ptsy.push_back(next_wp0[1]);
-                    ptsy.push_back(next_wp1[1]);
-                    ptsy.push_back(next_wp2[1]);
+                    vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
+                    for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
+                    {
+                        for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
+                        {
+                            vector<double> next_wp = getXY(car_s + i, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                            ptsx.push_back(next_wp[0]);
+                            ptsy.push_back(next_wp[1]);
+                        }
+                    }
 
                     for (int i = 0; i < ptsx.size(); ++i)
                     {
@@ -425,32 +427,31 @@ int main()
                     vector<double> next_y_vals;
 
                     // Start with previous path points from last time
-                    int previous_points_used = (previous_path_x.size() > 50) ? 50 : previous_path_x.size();
-                    for (int i = 0; i < previous_points_used; ++i)
+                    for (int i = 0; i < previous_path_x.size() && i < PREVIOUS_PATH_POINTS_TO_TAKE; ++i) 
                     {
-                        /*std::cout << "point[" << i << "] = {"
-                            << previous_path_x[i] << ","
-                            << previous_path_y[i] << "}" << std::endl;*/
-                        next_x_vals.push_back(previous_path_x[i]);
-                        next_y_vals.push_back(previous_path_y[i]);
+                        //Redefine reference state as previous path end point
+                        ref_x = previous_path_x[i];
+                        ref_y = previous_path_y[i];
+                        next_x_vals.push_back(ref_x);
+                        next_y_vals.push_back(ref_y);
                     }
 
                     // Calculate how to break up spline points so that we travel at our desired reference velocity
-                    double target_x = 30.0;
+                    double target_x = ego.v > 10.0 ? ego.v : 10.0; ;
                     double target_y = s(target_x);
                     double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
                     double div = (ego.v / 2.24) * 0.02;
                     double N = fabs(div) > 0.01 ? target_dist / div : 3000.0;
-                    std::cout << "target_x: " << target_x << std::endl;
+                    /*std::cout << "target_x: " << target_x << std::endl;
                     std::cout << "target_y: " << target_y << std::endl;
                     std::cout << "target_dist: " << target_dist << std::endl;
-                    std::cout << "N: " << N << std::endl;
+                    std::cout << "N: " << N << std::endl;*/
 
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
                     double frenet_x_point = 0.0;
                     double x_add_on = target_x / N;
-                    for (int i = 1; i <= (50 - previous_points_used); ++i)
+                    while (next_x_vals.size() <= 50)
                     {
                         double x_point = frenet_x_point + x_add_on;
                         double y_point = s(x_point);

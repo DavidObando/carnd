@@ -453,6 +453,7 @@ void Vehicle::realize_lane_change(map<int, vector<vector<double>>> predictions, 
         delta = 1;
     }
     this->lane += delta;
+    this->goal_lane = this->lane;
     this->a = _max_accel_for_lane(predictions, this->lane, this->s);
 }
 
