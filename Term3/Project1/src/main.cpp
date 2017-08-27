@@ -206,7 +206,7 @@ int main()
     map<int, Vehicle> other_vehicles;
     Vehicle ego(1, 0, 0.1, 0);
     ego.last_update = std::chrono::system_clock::now();
-    ego.configure(target_vel, 3, 0.224, 1, 100);
+    ego.configure(target_vel, 3, 0.224, 1, 10000);
 
     h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
         (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
@@ -289,20 +289,13 @@ int main()
                     {
                         ego.v += .224;
                     }
-                    ego.a = (ego.v - car_speed) / ((right_now - ego.last_update).count());
-                    /*if (ego.v < 0)
-                    {
-                        ego.v = 0.0;
-                    }
-                    else if (ego.v > 49.5)
-                    {
-                        ego.v = 49.5;
-                    }*/
+                    ego.a = (ego.v - car_speed) / (egodt.count());
                     ego.s = car_s;
                     ego.last_update = right_now;
-                    /*std::cout << "Ego speed: " << ego.v << std::endl;
+                    std::cout << "Reported speed: " << car_speed << std::endl;
+                    std::cout << "Ego speed: " << ego.v << std::endl;
                     std::cout << "Ego acceleration: " << ego.a << std::endl;
-                    std::cout << "Ego DT: " << egodt.count() << std::endl;*/
+                    std::cout << "Ego DT: " << egodt.count() << std::endl;
 
                     // update car map
                     map<int, vector<vector<double>>> predictions;
@@ -437,7 +430,8 @@ int main()
                     }
 
                     // Calculate how to break up spline points so that we travel at our desired reference velocity
-                    double target_x = ego.v > 10.0 ? ego.v : 10.0; ;
+                    //double target_x = ego.v > 10.0 ? ego.v : 10.0;
+                    double target_x = 30;
                     double target_y = s(target_x);
                     double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
@@ -471,6 +465,7 @@ int main()
                         next_x_vals.push_back(x_point);
                         next_y_vals.push_back(y_point);
                     }
+                    std::cout << "Ego: " << std::endl << ego.display() << std::endl;
 
                     json msgJson;
                     msgJson["next_x"] = next_x_vals;

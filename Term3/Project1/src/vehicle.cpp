@@ -174,16 +174,11 @@ double Vehicle::change_lane_cost(vector<Vehicle> trajectory, map<int, vector<vec
 {
     // Penalizes lane changes AWAY from the goal lane and rewards
     // lane changes TOWARDS the goal lane.
-    double cost = 0.0;
-    if (data.end_lanes_from_goal > trajectory[0].lane)
+    if (data.end_lanes_from_goal > 0)
     {
-        cost = COMFORT;
+        return COMFORT;
     }
-    else if (data.end_lanes_from_goal < trajectory[0].lane)
-    {
-        cost = -COMFORT;
-    }
-    return cost;
+    return 0;
 }
 
 void Vehicle::update_state(map<int, vector<vector<double>>> predictions)
@@ -224,11 +219,11 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions)
     vector<string> states = {"KL"};
     if (this->lane > 0)
     {
-        states.push_back("LCR");
+        states.push_back("LCL");
     }
     if (this->lane < (this->lanes_available - 1))
     {
-        states.push_back("LCL");
+        states.push_back("LCR");
     }
     map<int, vector<vector<double>>> pred_copy;
     for (auto p = predictions.begin(); p != predictions.end(); ++p)
@@ -246,7 +241,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions)
         pred_copy.insert({p->first, q_copy});
     }
     map<string, double> costs;
-    const int horizon = 5;
+    const int horizon = 10;
     for (auto s = states.begin(); s != states.end(); s++)
     {
         vector<Vehicle> trajectories;
@@ -275,10 +270,18 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions)
     string newState = states[0];
     for (auto s = states.begin(); s != states.end(); s++)
     {
+        std::cout << std::endl << "Possible state: " << *s << std::endl;
+        std::cout << "Possible cost: " << costs[*s] << std::endl << std::endl;
         if (costs[*s] < costs[newState])
         {
             newState = *s;
         }
+    }
+    if (this->state != newState)
+    {
+        std::cout << "Previous state: " << this->state << std::endl;
+        std::cout << "New state: " << newState << std::endl;
+        std::cout << "New state cost: " << costs[newState] << std::endl;
     }
     this->state = newState;
 }
@@ -448,11 +451,20 @@ void Vehicle::realize_keep_lane(map<int, vector<vector<double>>> predictions)
 void Vehicle::realize_lane_change(map<int, vector<vector<double>>> predictions, string direction)
 {
     int delta = -1;
-    if (direction.compare("L") == 0)
+    if (direction.compare("R") == 0)
     {
         delta = 1;
     }
     this->lane += delta;
+    // ensure the new lane is still within boundaries
+    if (this->lane >= this->lanes_available)
+    {
+        this->lane = this->lanes_available - 1;
+    }
+    else if (this->lane < 0)
+    {
+        this->lane = 0;
+    }
     this->goal_lane = this->lane;
     this->a = _max_accel_for_lane(predictions, this->lane, this->s);
 }
