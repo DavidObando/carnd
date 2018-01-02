@@ -69,7 +69,7 @@ public:
     */
     virtual ~Vehicle();
 
-    void update_state(map<int, vector <vector<double> > > predictions);
+    void update_state(map<int, vector <vector<double> > > predictions, int horizon = PLANNING_HORIZON);
 
     void configure(double target_speed, int lanes_available, double max_acceleration, int goal_lane, int goal_s);
 
@@ -95,7 +95,7 @@ public:
 
     void realize_prep_lane_change(map<int,vector< vector<double> > > predictions, string direction);
 
-    vector<vector<double> > generate_predictions(int horizon);
+    vector<vector<double> > generate_predictions(int horizon = PLANNING_HORIZON);
 
     // new functions:
 
@@ -122,14 +122,14 @@ public:
     double change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
 
 private:
-    static const int DESIRED_BUFFER = 1.5; // timesteps
-    static const int PLANNING_HORIZON = 2;
+    static const int DESIRED_BUFFER = 2; // timesteps
+    static const int PLANNING_HORIZON = 3;
 
-    static const long long COLLISION  = pow(10, 6);
-    static const long long DANGER     = pow(10, 5);
-    static const long long REACH_GOAL = pow(10, 4);
-    static const long long COMFORT    = pow(10, 3);
-    static const long long EFFICIENCY = pow(10, 4);
+    static const long long REACH_GOAL = pow(10, 1);
+    static const long long COMFORT    = pow(10, 2);
+    static const long long DANGER     = pow(10, 4);
+    static const long long EFFICIENCY = pow(10, 6);
+    static const long long COLLISION  = pow(10, 8);
 
 };
 

@@ -51,19 +51,27 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
     int collides = -1;
     auto filtered = filter_predictions_by_lane(predictions, proposed_lane);
 
-    for (int i = 1; i < PLANNING_HORIZON + 1; ++i)
+    for (int i = 1; i <= PLANNING_HORIZON && i < trajectory.size(); ++i)
     {
         auto snapshot = trajectory[i];
         accels.push_back(snapshot.a);
         for (auto f = filtered.begin(); f != filtered.end(); ++f)
         {
+            if (i >= f->second.size())
+            {
+                // not enough prediction data in this lane for the
+                // vehicle being observed
+                continue;
+            }
             auto state = f->second[i];
             auto last_state = f->second[i - 1];
+            // state is: 0: lane, 1: s, 2: v, 3: a
             bool vehicle_collides = check_collision(snapshot, last_state[1], state[1]);
             if (collides == -1 && vehicle_collides)
             {
                 collides = i;
             }
+            // state is: 0: lane, 1: s, 2: v, 3: a
             auto dist = abs(state[1] - snapshot.s);
             if (dist < closest_approach)
             {
@@ -71,6 +79,7 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
             }
         }
     }
+    cout << "Closest approach: " << closest_approach << endl;
     double max_accel = accels[0];
     double rms_acceleration = 0;
     for (int i = 0; i < accels.size(); ++i)
@@ -102,7 +111,7 @@ map<int, vector<vector<double>>> Vehicle::filter_predictions_by_lane(map<int, ve
     {
         auto v_id = p->first;
         auto predicted_traj = p->second;
-        if (predicted_traj[0][0] == lane && v_id != -1 /*Road::ego_key*/)
+        if (predicted_traj[0][0] == lane && v_id != -1 /*-1 is the ID of ego*/)
         {
             filtered.insert({v_id, predicted_traj});
         }
@@ -125,6 +134,7 @@ bool Vehicle::check_collision(Vehicle snapshot, int s_previous, int s_now)
     {
         return v_target > snapshot.v;
     }
+    return false;
 }
 
 double Vehicle::distance_from_goal_lane(vector<Vehicle> trajectory, map<int, vector<vector<double>>> predictions, TrajectoryData data)
@@ -157,7 +167,7 @@ double Vehicle::collision_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 
 double Vehicle::buffer_cost(vector<Vehicle> trajectory, map<int, vector<vector<double>>> predictions, TrajectoryData data)
 {
-    if (data.closest_approach == 0)
+    if (data.closest_approach <= 0)
     {
         return 10 * DANGER;
     }
@@ -181,7 +191,27 @@ double Vehicle::change_lane_cost(vector<Vehicle> trajectory, map<int, vector<vec
     return 0;
 }
 
-void Vehicle::update_state(map<int, vector<vector<double>>> predictions)
+map<int, vector<vector<double>>> deep_copy(map<int, vector<vector<double>>> predictions)
+{
+    map<int, vector<vector<double>>> pred_copy;
+    for (auto p = predictions.begin(); p != predictions.end(); ++p)
+    {
+        vector<vector<double>> q_copy;
+        for (auto q = p->second.begin(); q != p->second.end(); ++q)
+        {
+            vector<double> r_copy;
+            for (auto r = q->begin(); r != q->end(); ++r)
+            {
+                r_copy.push_back(*r);
+            }
+            q_copy.push_back(r_copy);
+        }
+        pred_copy.insert({p->first, q_copy});
+    }
+    return pred_copy;
+}
+
+void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int horizon)
 {
     /*
     Updates the "state" of the vehicle by assigning one of the
@@ -216,44 +246,31 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions)
     }
 
     */
-    vector<string> states = {"KL"};
+    vector<string> states = {/*"CS",*/ "KL"};
     if (this->lane > 0)
     {
+        //states.push_back("PLCL");
         states.push_back("LCL");
     }
     if (this->lane < (this->lanes_available - 1))
     {
+        //states.push_back("PLCR");
         states.push_back("LCR");
     }
-    map<int, vector<vector<double>>> pred_copy;
-    for (auto p = predictions.begin(); p != predictions.end(); ++p)
-    {
-        vector<vector<double>> q_copy;
-        for (auto q = p->second.begin(); q != p->second.end(); ++q)
-        {
-            vector<double> r_copy;
-            for (auto r = q->begin(); r != q->end(); ++r)
-            {
-                r_copy.push_back(*r);
-            }
-            q_copy.push_back(r_copy);
-        }
-        pred_copy.insert({p->first, q_copy});
-    }
     map<string, double> costs;
-    const int horizon = 10;
     for (auto s = states.begin(); s != states.end(); s++)
     {
         vector<Vehicle> trajectories;
         auto simil0 = this->clone();
         simil0.state = *s;
         trajectories.push_back(simil0);
-        for (int i = 0; i < horizon; ++i)
+        auto pred_copy = deep_copy(predictions);
+        for (int i = 1; i <= horizon; ++i)
         {
             auto simil = this->clone();
             simil.state = *s;
             simil.realize_state(pred_copy);
-            simil.increment(1);
+            simil.increment(i);
             trajectories.push_back(simil);
             for (auto p = pred_copy.begin(); p != pred_copy.end(); ++p)
             {
@@ -472,7 +489,7 @@ void Vehicle::realize_lane_change(map<int, vector<vector<double>>> predictions, 
 void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predictions, string direction)
 {
     int delta = -1;
-    if (direction.compare("L") == 0)
+    if (direction.compare("R") == 0)
     {
         delta = 1;
     }
@@ -536,7 +553,7 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predicti
     }
 }
 
-vector<vector<double>> Vehicle::generate_predictions(int horizon = 10)
+vector<vector<double>> Vehicle::generate_predictions(int horizon)
 {
 
     vector<vector<double>> predictions;

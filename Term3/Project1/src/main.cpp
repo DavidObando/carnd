@@ -279,8 +279,6 @@ int main()
                             }
                         }
                     }
-
-                    std::chrono::duration<double> egodt = right_now - ego.last_update;
                     if (too_close)
                     {
                         ego.v -= .224;
@@ -289,63 +287,68 @@ int main()
                     {
                         ego.v += .224;
                     }
-                    ego.a = (ego.v - car_speed) / (egodt.count());
-                    ego.s = car_s;
-                    ego.last_update = right_now;
-                    std::cout << "Reported speed: " << car_speed << std::endl;
-                    std::cout << "Ego speed: " << ego.v << std::endl;
-                    std::cout << "Ego acceleration: " << ego.a << std::endl;
-                    std::cout << "Ego DT: " << egodt.count() << std::endl;
 
-                    // update car map
-                    map<int, vector<vector<double>>> predictions;
-                    for (int i = 0; i < sensor_fusion.size(); ++i)
+                    std::chrono::duration<double> egodt = right_now - ego.last_update;
+                    if (egodt.count() >= 1)
                     {
-                        int check_car_id = sensor_fusion[i][0];
-                        double check_car_vx = sensor_fusion[i][3];
-                        double check_car_vy = sensor_fusion[i][4];
-                        double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
-                        double check_car_s = sensor_fusion[i][5];
-                        float check_car_d = sensor_fusion[i][6];
-                        map<int, Vehicle>::iterator it;
-                        if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
+                        ego.a = (ego.v - car_speed) / (egodt.count());
+                        ego.s = car_s;
+                        ego.last_update = right_now;
+                        std::cout << "Reported speed: " << car_speed << std::endl;
+                        std::cout << "Ego speed: " << ego.v << std::endl;
+                        std::cout << "Ego acceleration: " << ego.a << std::endl;
+                        std::cout << "Ego DT: " << egodt.count() << std::endl;
+
+                        // update car map
+                        map<int, vector<vector<double>>> predictions;
+                        for (int i = 0; i < sensor_fusion.size(); ++i)
+                        {
+                            int check_car_id = sensor_fusion[i][0];
+                            double check_car_vx = sensor_fusion[i][3];
+                            double check_car_vy = sensor_fusion[i][4];
+                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
+                            double check_car_s = sensor_fusion[i][5];
+                            float check_car_d = sensor_fusion[i][6];
+                            map<int, Vehicle>::iterator it;
+                            if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
+                            {
+                                auto delta_t = (right_now - it->second.last_update).count();
+                                if (delta_t <= 5.0)
+                                {
+                                    // we saw this dude less than 5 seconds ago, so use it
+                                    // to calculate its current acceleration
+                                    it->second.a = (check_car_v - it->second.v) / delta_t;
+                                }
+                                it->second.v = check_car_v;
+                                it->second.s = check_car_s;
+                                it->second.lane = check_car_d;
+                                // refresh instance in cache
+                                it->second.last_update = right_now;
+                                predictions[check_car_id] = it->second.generate_predictions();
+                            }
+                            else
+                            {
+                                Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
+                                check_car.last_update = right_now;
+                                other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
+                                predictions[check_car_id] = check_car.generate_predictions();
+                            }
+                        }
+                        // clean up the car cache
+                        for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
                         {
                             auto delta_t = (right_now - it->second.last_update).count();
-                            if (delta_t <= 5.0)
+                            if (delta_t > 5.0)
                             {
-                                // we saw this dude less than 5 seconds ago, so use it
-                                // to calculate its current acceleration
-                                it->second.a = (check_car_v - it->second.v) / delta_t;
+                                // purge
+                                other_vehicles.erase(it->first);
                             }
-                            it->second.v = check_car_v;
-                            it->second.s = check_car_s;
-                            it->second.lane = check_car_d;
-                            // refresh instance in cache
-                            it->second.last_update = right_now;
-                            predictions[check_car_id] = it->second.generate_predictions(10);
                         }
-                        else
-                        {
-                            Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
-                            check_car.last_update = right_now;
-                            other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
-                            predictions[check_car_id] = check_car.generate_predictions(10);
-                        }
-                    }
-                    // clean up the car cache
-                    for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
-                    {
-                        auto delta_t = (right_now - it->second.last_update).count();
-                        if (delta_t > 5.0)
-                        {
-                            // purge
-                            other_vehicles.erase(it->first);
-                        }
-                    }
 
-                    predictions[-1] = ego.generate_predictions(10);
-                    ego.update_state(predictions);
-                    ego.realize_state(predictions);
+                        predictions[-1] = ego.generate_predictions();
+                        ego.update_state(predictions);
+                        ego.realize_state(predictions);
+                    }
 
                     vector<double> ptsx;
                     vector<double> ptsy;
@@ -354,8 +357,6 @@ int main()
                     double ref_x = car_x;
                     double ref_y = car_y;
                     double ref_yaw = deg2rad(car_yaw);
-
-                    int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20); 
 
                     // if the previous state is almost empty, use the car as starting reference
                     if (prev_size < 2)
@@ -418,6 +419,8 @@ int main()
                     // Define the actual (x,y) points we'll use for the planner
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
+
+                    int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20);
 
                     // Start with previous path points from last time
                     for (int i = 0; i < previous_path_x.size() && i < PREVIOUS_PATH_POINTS_TO_TAKE; ++i) 
