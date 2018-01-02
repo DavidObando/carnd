@@ -203,7 +203,7 @@ int main()
     // vehicle initialization parameters
     int lane = 1;
     double s = 0;
-    double v = 0
+    double v = 0;
     double a = 0;
     Vehicle ego(lane, s, v, a);
     double target_vel = 49.85;
@@ -314,7 +314,13 @@ int main()
                             double check_car_vy = sensor_fusion[i][4];
                             double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
                             double check_car_s = sensor_fusion[i][5];
-                            float check_car_d = sensor_fusion[i][6];
+                            int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
+                            /*std::cout << "check_car_id: " << check_car_id << std::endl;
+                            std::cout << "check_car_vx: " << check_car_vx << std::endl;
+                            std::cout << "check_car_vy: " << check_car_vy << std::endl;
+                            std::cout << "check_car_v: " << check_car_v << std::endl;
+                            std::cout << "check_car_s: " << check_car_s << std::endl;
+                            std::cout << "check_car_d: " << check_car_d << std::endl;*/
                             map<int, Vehicle>::iterator it;
                             if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
                             {
