@@ -200,13 +200,19 @@ int main()
         map_waypoints_dy.push_back(d_y);
     }
 
-    // the velocity we'll aim at, gets updated based on environment
+    // vehicle initialization parameters
+    int lane = 1;
+    double s = 0;
+    double v = 0
+    double a = 0;
+    Vehicle ego(lane, s, v, a);
     double target_vel = 49.85;
+    int lanes_available = 3;
+    double max_acceleration = 5;
+    ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
+    ego.last_update = std::chrono::system_clock::now();
 
     map<int, Vehicle> other_vehicles;
-    Vehicle ego(1, 0, 0.1, 0);
-    ego.last_update = std::chrono::system_clock::now();
-    ego.configure(target_vel, 3, 0.224, 1, 10000);
 
     h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
         (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
@@ -279,22 +285,22 @@ int main()
                             }
                         }
                     }
-                    if (too_close)
+                    /*if (too_close)
                     {
                         ego.v -= .224;
                     }
                     else if (ego.v < 49.5)
                     {
                         ego.v += .224;
-                    }
+                    }*/
 
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
                     if (egodt.count() >= 1)
                     {
-                        ego.a = (ego.v - car_speed) / (egodt.count());
                         ego.s = car_s;
+                        ego.v = car_speed;
+                        ego.goal_s = ego.s + 200;
                         ego.last_update = right_now;
-                        std::cout << "Reported speed: " << car_speed << std::endl;
                         std::cout << "Ego speed: " << ego.v << std::endl;
                         std::cout << "Ego acceleration: " << ego.a << std::endl;
                         std::cout << "Ego DT: " << egodt.count() << std::endl;
@@ -348,6 +354,7 @@ int main()
                         predictions[-1] = ego.generate_predictions();
                         ego.update_state(predictions);
                         ego.realize_state(predictions);
+                        ego.increment(egodt.count());
                     }
 
                     vector<double> ptsx;
@@ -468,7 +475,7 @@ int main()
                         next_x_vals.push_back(x_point);
                         next_y_vals.push_back(y_point);
                     }
-                    std::cout << "Ego: " << std::endl << ego.display() << std::endl;
+                    //std::cout << "Ego: " << std::endl << ego.display() << std::endl;
 
                     json msgJson;
                     msgJson["next_x"] = next_x_vals;

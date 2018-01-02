@@ -270,7 +270,11 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             auto simil = this->clone();
             simil.state = *s;
             simil.realize_state(pred_copy);
-            simil.increment(i);
+            for (int j = 0; j < i; ++j)
+            {
+                // increment by 1, i times
+                simil.increment(1);
+            }
             trajectories.push_back(simil);
             for (auto p = pred_copy.begin(); p != pred_copy.end(); ++p)
             {
