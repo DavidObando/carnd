@@ -126,8 +126,8 @@ private:
     static const int PLANNING_HORIZON = 3;
 
     static const long long REACH_GOAL = pow(10, 1);
-    static const long long COMFORT    = pow(10, 2);
-    static const long long EFFICIENCY = pow(10, 4);
+    static const long long EFFICIENCY = pow(10, 2);
+    static const long long COMFORT    = pow(10, 4);
     static const long long DANGER     = pow(10, 6);
     static const long long COLLISION  = pow(10, 8);
 

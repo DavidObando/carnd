@@ -261,40 +261,8 @@ int main()
                         end_path_s = car_s;
                     }
 
-                    /*bool too_close = false;
-
-                    // find reference velocity to use
-                    for (int i = 0; i < sensor_fusion.size(); ++i)
-                    {
-                        // car is in my lane
-                        float d = sensor_fusion[i][6];
-                        if (d >= (4 * ego.lane) && d <= ((4 * ego.lane) + 4))
-                        {
-                            double vx = sensor_fusion[i][3];
-                            double vy = sensor_fusion[i][4];
-                            double check_speed = sqrt((vx * vx) + (vy * vy));
-                            double check_car_s = sensor_fusion[i][5];
-
-                            check_car_s += ((double)prev_size * 0.02 * check_speed); // if using previous points we can project s value out
-                            // check s values greater than mine and s gap
-                            if (check_car_s > car_s && (check_car_s - car_s) < 30)
-                            {
-                                too_close = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (too_close)
-                    {
-                        ego.v -= .224;
-                    }
-                    else if (ego.v < 49.5)
-                    {
-                        ego.v += .224;
-                    }*/
-
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
-                    if (egodt.count() >= 1)
+                    if (egodt.count() >= 2) // refresh the path planning after this amount of seconds
                     {
                         ego.s = car_s;
                         ego.v = car_speed;
@@ -303,7 +271,7 @@ int main()
                         /*std::cout << "Ego speed: " << ego.v << std::endl;
                         std::cout << "Ego acceleration: " << ego.a << std::endl;
                         std::cout << "Ego DT: " << egodt.count() << std::endl;*/
-                        std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << "]" << std::endl;
+                        std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << "]" << std::endl;
 
                         // update car map
                         map<int, vector<vector<double>>> predictions;
@@ -319,9 +287,9 @@ int main()
                             }
                             double check_car_vx = sensor_fusion[i][3];
                             double check_car_vy = sensor_fusion[i][4];
-                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
+                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy)) * 2.23693629; // m/s -> mph
                             int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
-                            std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << "]" << std::endl;
+                            std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << "]" << std::endl;
                             /*std::cout << "check_car_id: " << check_car_id << std::endl;
                             std::cout << "check_car_vx: " << check_car_vx << std::endl;
                             std::cout << "check_car_vy: " << check_car_vy << std::endl;
@@ -355,14 +323,20 @@ int main()
                             }
                         }
                         // clean up the car cache
+                        vector<int> to_delete;
+                        // mark for deletion
                         for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
                         {
                             auto delta_t = (right_now - it->second.last_update).count();
                             if (delta_t > 5.0)
                             {
-                                // purge
-                                other_vehicles.erase(it->first);
+                                to_delete.push_back(it->first);
                             }
+                        }
+                        // purge
+                        for (auto index = to_delete.begin(); index != to_delete.end(); ++index)
+                        {
+                            other_vehicles.erase(*index);
                         }
 
                         ego.update_state(predictions);
@@ -409,7 +383,8 @@ int main()
                     }
 
                     // In Frenet, add evenly 30m spaced points ahead of the starting reference
-                    vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
+                    //vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
+                    vector<vector<int>> wp_params = {{30,90,30}};
                     for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
                     {
                         for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
