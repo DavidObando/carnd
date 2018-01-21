@@ -19,7 +19,7 @@ public:
     double avg_speed;
     int max_accel;
     double rms_acceleration;
-    int closest_approach;
+    double closest_approach;
     int end_distance_to_goal;
     int end_lanes_from_goal;
     int collides;
@@ -114,7 +114,7 @@ public:
     double calculate_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions);
     TrajectoryData get_helper_data(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions);
     map<int,vector<vector<double>>> filter_predictions_by_lane(map<int,vector<vector<double>>> predictions, int lane);
-    bool check_collision(Vehicle snapshot, int s_previous, int s_now);
+    bool check_collision(Vehicle snapshot, double s_previous, double s_now);
     double distance_from_goal_lane(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double inefficiency_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
@@ -127,8 +127,8 @@ private:
 
     static const long long REACH_GOAL = pow(10, 1);
     static const long long COMFORT    = pow(10, 2);
-    static const long long DANGER     = pow(10, 4);
-    static const long long EFFICIENCY = pow(10, 6);
+    static const long long EFFICIENCY = pow(10, 4);
+    static const long long DANGER     = pow(10, 6);
     static const long long COLLISION  = pow(10, 8);
 
 };
