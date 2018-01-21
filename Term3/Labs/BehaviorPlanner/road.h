@@ -17,11 +17,11 @@ public:
 
     int update_width = 70;
 
-      string ego_rep = " *** ";
+    string ego_rep = " *** ";
 
-      int ego_key = -1;
+    int ego_key = -1;
 
-      int num_lanes;
+    int num_lanes;
 
     vector<int> lane_speeds;
 
@@ -36,13 +36,13 @@ public:
     int vehicles_added = 0;
 
     /**
-     * Constructor
-     */
+    * Constructor
+    */
     Road(int speed_limit, double traffic_density, vector<int> lane_speeds);
 
     /**
-     * Destructor
-     */
+    * Destructor
+    */
     virtual ~Road();
 
     Vehicle get_ego();

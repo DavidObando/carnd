@@ -2,131 +2,88 @@
 #define VEHICLE_H
 #include <iostream>
 #include <random>
-#include <sstream>
-#include <fstream>
-#include <math.h>
 #include <vector>
 #include <map>
 #include <string>
-#include <iterator>
 
 using namespace std;
-
-class TrajectoryData {
-public:
-    int proposed_lane;
-    double avg_speed;
-    int max_accel;
-    double rms_acceleration;
-    int closest_approach;
-    int end_distance_to_goal;
-    int end_lanes_from_goal;
-    int collides;
-};
 
 class Vehicle {
 public:
 
-    struct collider{
-        bool collision ; // is there a collision?
-        int  time; // time collision happens
-    };
+  map<string, int> lane_direction = {{"PLCL", 1}, {"LCL", 1}, {"LCR", -1}, {"PLCR", -1}};
 
-    int L = 1;
+  struct collider{
 
-    int preferred_buffer = 6; // impacts "keep lane" behavior.
+    bool collision ; // is there a collision?
+    int  time; // time collision happens
 
-    int lane;
+  };
 
-    int s;
+  int L = 1;
 
-    int v;
+  int preferred_buffer = 6; // impacts "keep lane" behavior.
 
-    int a;
+  int lane;
 
-    int target_speed;
+  int s;
 
-    int lanes_available;
+  float v;
 
-    int max_acceleration;
+  float a;
 
-    int goal_lane;
+  float target_speed;
 
-    int goal_s;
+  int lanes_available;
 
-    string state;
+  float max_acceleration;
 
-    /**
-    * Constructor
-    */
-    Vehicle(int lane, int s, int v, int a);
+  int goal_lane;
 
-    /**
-    * Destructor
-    */
-    virtual ~Vehicle();
+  int goal_s;
 
-    void update_state(map<int, vector <vector<int> > > predictions);
+  string state;
 
-    void configure(vector<int> road_data);
+  /**
+  * Constructor
+  */
+  Vehicle();
+  Vehicle(int lane, float s, float v, float a, string state="CS");
 
-    string display();
+  /**
+  * Destructor
+  */
+  virtual ~Vehicle();
 
-    void increment(int dt);
+  vector<Vehicle> choose_next_state(map<int, vector<Vehicle>> predictions);
 
-    vector<int> state_at(int t);
+  vector<string> successor_states();
 
-    bool collides_with(Vehicle other, int at_time);
+  vector<Vehicle> generate_trajectory(string state, map<int, vector<Vehicle>> predictions);
 
-    collider will_collide_with(Vehicle other, int timesteps);
+  vector<float> get_kinematics(map<int, vector<Vehicle>> predictions, int lane);
 
-    void realize_state(map<int, vector < vector<int> > > predictions);
+  vector<Vehicle> constant_speed_trajectory();
 
-    void realize_constant_speed();
+  vector<Vehicle> keep_lane_trajectory(map<int, vector<Vehicle>> predictions);
 
-    int _max_accel_for_lane(map<int,vector<vector<int> > > predictions, int lane, int s);
+  vector<Vehicle> lane_change_trajectory(string state, map<int, vector<Vehicle>> predictions);
 
-    void realize_keep_lane(map<int, vector< vector<int> > > predictions);
+  vector<Vehicle> prep_lane_change_trajectory(string state, map<int, vector<Vehicle>> predictions);
 
-    void realize_lane_change(map<int,vector< vector<int> > > predictions, string direction);
+  void increment(int dt);
 
-    void realize_prep_lane_change(map<int,vector< vector<int> > > predictions, string direction);
+  float position_at(int t);
 
-    vector<vector<int> > generate_predictions(int horizon);
+  bool get_vehicle_behind(map<int, vector<Vehicle>> predictions, int lane, Vehicle & rVehicle);
 
-    // new functions:
+  bool get_vehicle_ahead(map<int, vector<Vehicle>> predictions, int lane, Vehicle & rVehicle);
 
-    Vehicle clone()
-    {
-        Vehicle c(this->lane, this->s, this->v, this->a);
-        c.target_speed = this->target_speed;
-        c.lanes_available = this->lanes_available;
-        c.max_acceleration = this->max_acceleration;
-        c.goal_lane = this->goal_lane;
-        c.goal_s = this->goal_s;
-        c.state = this->state;
-        return c;
-    };
+  vector<Vehicle> generate_predictions(int horizon=2);
 
-    double calculate_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions);
-    TrajectoryData get_helper_data(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions);
-    map<int,vector<vector<int>>> filter_predictions_by_lane(map<int,vector<vector<int>>> predictions, int lane);
-    bool check_collision(Vehicle snapshot, int s_previous, int s_now);
-    double distance_from_goal_lane(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
-    double inefficiency_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
-    double collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
-    double buffer_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
-    double change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<int>>> predictions, TrajectoryData data);
+  void realize_next_state(vector<Vehicle> trajectory);
 
-private:
-    static const int DESIRED_BUFFER = 1.5; // timesteps
-    static const int PLANNING_HORIZON = 2;
-
-    static const long long COLLISION  = pow(10, 6);
-    static const long long DANGER     = pow(10, 5);
-    static const long long REACH_GOAL = pow(10, 5);
-    static const long long COMFORT    = pow(10, 4);
-    static const long long EFFICIENCY = pow(10, 2);
+  void configure(vector<int> road_data);
 
 };
 

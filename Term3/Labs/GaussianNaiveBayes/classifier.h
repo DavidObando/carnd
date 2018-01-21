@@ -11,22 +11,22 @@ using namespace std;
 class GNB {
 public:
 
-	vector<string> possible_labels = {"left","keep","right"};
+    vector<string> possible_labels = {"left","keep","right"};
 
 
-	/**
-  	* Constructor
-  	*/
- 	GNB();
+    /**
+    * Constructor
+    */
+    GNB();
 
-	/**
- 	* Destructor
- 	*/
- 	virtual ~GNB();
+    /**
+    * Destructor
+    */
+    virtual ~GNB();
 
- 	void train(vector<vector<double> > data, vector<string>  labels);
+    void train(vector<vector<double> > data, vector<string>  labels);
 
-  	string predict(vector<double>);
+    string predict(vector<double>);
 
 private:
     vector<vector<double>> _theta;
