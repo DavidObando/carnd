@@ -122,7 +122,7 @@ public:
     double change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
 
 private:
-    static const int DESIRED_BUFFER = 2; // timesteps
+    static const int DESIRED_BUFFER = 4; // timesteps
     static const int PLANNING_HORIZON = 3;
 
     static const long long REACH_GOAL = pow(10, 1);

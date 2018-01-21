@@ -262,7 +262,7 @@ int main()
                     }
 
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
-                    if (egodt.count() >= 2) // refresh the path planning after this amount of seconds
+                    if (egodt.count() >= 1) // refresh the path planning after this amount of seconds
                     {
                         ego.s = car_s;
                         ego.v = car_speed;

@@ -17,7 +17,7 @@ Vehicle::Vehicle(int lane, double s, double v, double a)
     this->s = s;
     this->v = v;
     this->a = a;
-    state = "CS";
+    state = "KL";
     max_acceleration = -1;
 }
 
@@ -162,8 +162,12 @@ double Vehicle::collision_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 {
     if (data.collides != -1)
     {
+        std::cout << "    >> data.collides: " << data.collides << endl;
         double exponent = pow(data.collides, 2);
+        std::cout << "    >> exponent: " << exponent << endl;
         double multiplier = exp(-exponent);
+        std::cout << "    >> multiplier: " << multiplier << endl;
+        std::cout << "    >> COLLISION: " << COLLISION << endl;
         return multiplier * COLLISION;
     }
     return 0;
@@ -177,13 +181,17 @@ double Vehicle::buffer_cost(vector<Vehicle> trajectory, map<int, vector<vector<d
     }
     double timesteps_away = double(data.closest_approach) / data.avg_speed;
     std::cout << "    >> data.closest_approach: " << data.closest_approach << endl;
+    std::cout << "    >> data.avg_speed: " << data.avg_speed << endl;
     std::cout << "    >> timesteps_away: " << timesteps_away << endl;
     std::cout << "    >> DESIRED_BUFFER: " << DESIRED_BUFFER << endl;
     if (timesteps_away > DESIRED_BUFFER)
     {
         return 0;
     }
+    std::cout << "    >> (timesteps_away / DESIRED_BUFFER): " << (timesteps_away / DESIRED_BUFFER) << endl;
     double multiplier = 1.0 - pow((timesteps_away / DESIRED_BUFFER), 2);
+    std::cout << "    >> multiplier: " << multiplier << endl;
+    std::cout << "    >> DANGER: " << DANGER << endl;
     return multiplier * DANGER;
 }
 
@@ -216,6 +224,36 @@ map<int, vector<vector<double>>> deep_copy(map<int, vector<vector<double>>> pred
         pred_copy.insert({p->first, q_copy});
     }
     return pred_copy;
+}
+
+vector<string> get_possible_states(Vehicle* v, bool usePrepareStates=true)
+{
+    vector<string> states = { "KL" };
+    if (v->lane > 0)
+    {
+        if (usePrepareStates
+            && (v->state == "KL" || v->state == "PLCL"))
+        {
+            states.push_back("PLCL");
+        }
+        if (!usePrepareStates || v->state == "PLCL")
+        {
+            states.push_back("LCL");
+        }
+    }
+    if (v->lane < (v->lanes_available - 1))
+    {
+        if (usePrepareStates &&
+            (v->state == "KL" || v->state == "PLCR"))
+        {
+            states.push_back("PLCR");
+        }
+        if (!usePrepareStates || v->state == "PLCR")
+        {
+            states.push_back("LCR");
+        }
+    }
+    return states;
 }
 
 void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int horizon)
@@ -253,17 +291,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
     }
 
     */
-    vector<string> states = {/*"CS",*/ "KL"};
-    if (this->lane > 0)
-    {
-        //states.push_back("PLCL");
-        states.push_back("LCL");
-    }
-    if (this->lane < (this->lanes_available - 1))
-    {
-        //states.push_back("PLCR");
-        states.push_back("LCR");
-    }
+    vector<string> states = get_possible_states(this);
     map<string, double> costs;
     for (auto s = states.begin(); s != states.end(); s++)
     {
@@ -298,6 +326,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
         trajectories.push_back(simil0.clone());
         for (int i = 1; i <= horizon; ++i)
         {
+            // pop the closest level of predictions from pred copy
             for (auto p = pred_copy.begin(); p != pred_copy.end(); ++p)
             {
                 auto pv = p->second;
@@ -307,6 +336,19 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
                     pv.erase(pv.begin());
                 }
             }
+            // fan out all possible states at this future state, when different from "KL"
+            if (*s != "KL")
+            {
+                auto simil_states = get_possible_states(&simil0, false);
+                for (auto s1 = states.begin(); s1 != states.end(); s1++)
+                {
+                    auto simil1 = simil0.clone();
+                    simil1.state = *s1;
+                    simil1.realize_state(pred_copy);
+                    trajectories.push_back(simil1.clone());
+                }
+            }
+            // extend the trajectory by the "KL" branch
             simil0.goal_lane = simil0.lane;
             simil0.state = "KL";
             simil0.realize_state(pred_copy);
@@ -331,6 +373,10 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
         std::cout << "Previous state: " << this->state << std::endl;
         std::cout << "New state: " << newState << std::endl;
         std::cout << "New state cost: " << costs[newState] << std::endl;
+    }
+    else
+    {
+        std::cout << "Current state: " << this->state << std::endl;
     }
     this->state = newState;
 }
