@@ -35,8 +35,6 @@ public:
 
     int L = 1;
 
-    int preferred_buffer = 6; // impacts "keep lane" behavior.
-
     int lane;
 
     double s;
@@ -123,7 +121,8 @@ public:
 
 private:
     static const int DESIRED_BUFFER = 4; // timesteps
-    static const int PLANNING_HORIZON = 3;
+    static const int PLANNING_HORIZON = 10;
+    static const int PREFERRED_BUFFER = 20; // impacts "keep lane" behavior.
 
     static const long long REACH_GOAL = pow(10, 1);
     static const long long EFFICIENCY = pow(10, 2);

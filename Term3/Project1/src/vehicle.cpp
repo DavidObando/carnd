@@ -339,7 +339,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             // fan out all possible states at this future state, when different from "KL"
             if (*s != "KL")
             {
-                auto simil_states = get_possible_states(&simil0, false);
+                auto simil_states = get_possible_states(&simil0);
                 for (auto s1 = states.begin(); s1 != states.end(); s1++)
                 {
                     auto simil1 = simil0.clone();
@@ -352,6 +352,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             simil0.goal_lane = simil0.lane;
             simil0.state = "KL";
             simil0.realize_state(pred_copy);
+            simil0.state = *s;
             simil0.increment(1);
             trajectories.push_back(simil0.clone());
         }
@@ -532,7 +533,7 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions
         double next_pos = leading[1][1];
         double my_next = s + this->v;
         double separation_next = next_pos - my_next;
-        double available_room = separation_next - preferred_buffer;
+        double available_room = separation_next - PREFERRED_BUFFER;
         max_acc = min(max_acc, available_room);
     }
     return max_acc;
@@ -625,8 +626,17 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predicti
         }
         else
         {
-            int my_min_acc = max(-this->max_acceleration, -delta_s);
+            double my_min_acc = max(-this->max_acceleration, -delta_s);
             this->a = my_min_acc;
+        }
+        // in order to avoid collisions in the current lane while preparing
+        // to change lanes, we must also account for the max acceleration
+        // we can have safely do without crashing with cars currently
+        // ahead of us
+        double current_lane_a = _max_accel_for_lane(predictions, this->lane, this->s);
+        if (this->a > current_lane_a)
+        {
+            this->a = current_lane_a;
         }
     }
 }

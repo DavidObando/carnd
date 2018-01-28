@@ -161,6 +161,26 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
     return {x, y};
 }
 
+double toMetersPerSecond(double milesPerHour)
+{
+    return milesPerHour / 2.23693629;
+}
+
+double toMilesPerHour(double metersPerSecond)
+{
+    return metersPerSecond * 2.23693629;
+}
+
+int toD(int lane)
+{
+    return (2 + (4 * lane));
+}
+
+// Waypoint map to read from
+const string map_file_ = "../data/highway_map.csv";
+// The max s value before wrapping around the track back to 0
+const double MAX_S = 6945.554;
+
 int main()
 {
     uWS::Hub h;
@@ -171,11 +191,6 @@ int main()
     vector<double> map_waypoints_s;
     vector<double> map_waypoints_dx;
     vector<double> map_waypoints_dy;
-
-    // Waypoint map to read from
-    string map_file_ = "../data/highway_map.csv";
-    // The max s value before wrapping around the track back to 0
-    double max_s = 6945.554;
 
     ifstream in_map_(map_file_.c_str(), ifstream::in);
 
@@ -287,7 +302,7 @@ int main()
                             }
                             double check_car_vx = sensor_fusion[i][3];
                             double check_car_vy = sensor_fusion[i][4];
-                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy)) * 2.23693629; // m/s -> mph
+                            double check_car_v = toMilesPerHour(sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy)));
                             int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
                             std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << "]" << std::endl;
                             /*std::cout << "check_car_id: " << check_car_id << std::endl;
@@ -344,6 +359,8 @@ int main()
                         ego.increment(egodt.count());
                     }
 
+                    int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20);
+
                     vector<double> ptsx;
                     vector<double> ptsy;
 
@@ -367,12 +384,12 @@ int main()
                     // use the previous path's end point as starting reference
                     else
                     {
-                        //Redefine reference state as previous path end point
-                        ref_x = previous_path_x[prev_size - 1];
-                        ref_y = previous_path_y[prev_size - 1];
+                        int reference_state_index = PREVIOUS_PATH_POINTS_TO_TAKE < prev_size ? PREVIOUS_PATH_POINTS_TO_TAKE : prev_size;
+                        ref_x = previous_path_x[reference_state_index - 1];
+                        ref_y = previous_path_y[reference_state_index - 1];
 
-                        double ref_x_prev = previous_path_x[prev_size - 2];
-                        double ref_y_prev = previous_path_y[prev_size - 2];
+                        double ref_x_prev = previous_path_x[reference_state_index - 2];
+                        double ref_y_prev = previous_path_y[reference_state_index - 2];
                         ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
 
                         //Use two points that make the path tangent to the previous path's end point
@@ -382,16 +399,24 @@ int main()
                         ptsy.push_back(ref_y);
                     }
 
-                    // In Frenet, add evenly 30m spaced points ahead of the starting reference
-                    //vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
-                    vector<vector<int>> wp_params = {{30,90,30}};
+                    // In Frenet, add evenly spaced points ahead of the end of the previous path
+                    vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
+                    //vector<vector<int>> wp_params = {{30,90,30}};
                     for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
                     {
                         for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
                         {
-                            vector<double> next_wp = getXY(end_path_s + i, (2 + (4 * ego.lane)), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                            ptsx.push_back(next_wp[0]);
-                            ptsy.push_back(next_wp[1]);
+                            double projected_s = end_path_s + i;
+                            if (projected_s > MAX_S)
+                            {
+                                projected_s = projected_s - MAX_S;
+                            }
+                            vector<double> next_wp = getXY(projected_s, toD(ego.lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                            if (next_wp[0] > ptsx[ptsx.size() - 1])
+                            {
+                                ptsx.push_back(next_wp[0]);
+                                ptsy.push_back(next_wp[1]);
+                            }
                         }
                     }
 
@@ -415,8 +440,6 @@ int main()
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
 
-                    int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20);
-
                     // Start with previous path points from last time
                     for (int i = 0; i < previous_path_x.size() && i < PREVIOUS_PATH_POINTS_TO_TAKE; ++i) 
                     {
@@ -433,7 +456,7 @@ int main()
                     double target_y = s(target_x);
                     double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
-                    double div = (ego.v / 2.24) * 0.02;
+                    double div = toMetersPerSecond(ego.v) * 0.02;
                     double N = fabs(div) > 0.01 ? target_dist / div : 3000.0;
                     /*std::cout << "target_x: " << target_x << std::endl;
                     std::cout << "target_y: " << target_y << std::endl;
