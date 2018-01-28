@@ -298,29 +298,6 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
         vector<Vehicle> trajectories;
         auto simil0 = this->clone();
         simil0.state = *s;
-        /*trajectories.push_back(simil0);
-        auto pred_copy = deep_copy(predictions);
-        for (int i = 1; i <= horizon; ++i)
-        {
-            auto simil = this->clone();
-            simil.state = *s;
-            simil.realize_state(pred_copy);
-            for (int j = 0; j < i; ++j)
-            {
-                // increment by 1, i times
-                simil.increment(1);
-            }
-            trajectories.push_back(simil);
-            for (auto p = pred_copy.begin(); p != pred_copy.end(); ++p)
-            {
-                auto pv = p->second;
-                if (pv.size() > 0)
-                {
-                    // pop the 0th element form the list of predictions for this item
-                    pv.erase(pv.begin());
-                }
-            }
-        }*/
         auto pred_copy = deep_copy(predictions);
         simil0.realize_state(pred_copy);
         trajectories.push_back(simil0.clone());
@@ -352,8 +329,8 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             simil0.goal_lane = simil0.lane;
             simil0.state = "KL";
             simil0.realize_state(pred_copy);
-            simil0.state = *s;
             simil0.increment(1);
+            simil0.state = *s;
             trajectories.push_back(simil0.clone());
         }
         std::cout << std::endl << "Possible state: " << *s << std::endl;
@@ -629,15 +606,15 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predicti
             double my_min_acc = max(-this->max_acceleration, -delta_s);
             this->a = my_min_acc;
         }
-        // in order to avoid collisions in the current lane while preparing
-        // to change lanes, we must also account for the max acceleration
-        // we can have safely do without crashing with cars currently
-        // ahead of us
-        double current_lane_a = _max_accel_for_lane(predictions, this->lane, this->s);
-        if (this->a > current_lane_a)
-        {
-            this->a = current_lane_a;
-        }
+    }
+    // in order to avoid collisions in the current lane while preparing
+    // to change lanes, we must also account for the max acceleration
+    // we can have safely do without crashing with cars currently
+    // ahead of us
+    double current_lane_a = _max_accel_for_lane(predictions, this->lane, this->s);
+    if (this->a > current_lane_a)
+    {
+        this->a = current_lane_a;
     }
 }
 

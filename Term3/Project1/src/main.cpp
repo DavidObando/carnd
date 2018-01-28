@@ -221,7 +221,7 @@ int main()
     double v = 0;
     double a = 0;
     Vehicle ego(lane, s, v, a);
-    double target_vel = 49.85;
+    double target_vel = toMetersPerSecond(49.85);
     int lanes_available = 3;
     double max_acceleration = 5;
     ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
@@ -302,7 +302,7 @@ int main()
                             }
                             double check_car_vx = sensor_fusion[i][3];
                             double check_car_vy = sensor_fusion[i][4];
-                            double check_car_v = toMilesPerHour(sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy)));
+                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
                             int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
                             std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << "]" << std::endl;
                             /*std::cout << "check_car_id: " << check_car_id << std::endl;
@@ -456,7 +456,7 @@ int main()
                     double target_y = s(target_x);
                     double target_dist = sqrt((target_x * target_x) + (target_y * target_y));
 
-                    double div = toMetersPerSecond(ego.v) * 0.02;
+                    double div = ego.v * 0.02;
                     double N = fabs(div) > 0.01 ? target_dist / div : 3000.0;
                     /*std::cout << "target_x: " << target_x << std::endl;
                     std::cout << "target_y: " << target_y << std::endl;
