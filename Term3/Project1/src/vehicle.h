@@ -121,7 +121,7 @@ public:
 
 private:
     static const int DESIRED_BUFFER = 4; // timesteps
-    static const int PLANNING_HORIZON = 10;
+    static const int PLANNING_HORIZON = 3;
     static const int PREFERRED_BUFFER = 20; // impacts "keep lane" behavior.
 
     static const long long REACH_GOAL = pow(10, 1);

@@ -27,15 +27,15 @@ double Vehicle::calculate_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 {
     auto trajectory_data = get_helper_data(trajectory, predictions);
     double dfgl = distance_from_goal_lane(trajectory, predictions, trajectory_data);
-    std::cout << " >> distance_from_goal_lane = " << dfgl << std::endl;
+    //std::cout << " >> distance_from_goal_lane = " << dfgl << std::endl;
     double ic = inefficiency_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> inefficiency_cost = " << ic << std::endl;
+    //std::cout << " >> inefficiency_cost = " << ic << std::endl;
     double cc = collision_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> collision_cost = " << cc << std::endl;
+    //std::cout << " >> collision_cost = " << cc << std::endl;
     double bc = buffer_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> buffer_cost = " << bc << std::endl;
+    //std::cout << " >> buffer_cost = " << bc << std::endl;
     double clc = change_lane_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> change_lane_cost = " << clc << std::endl;
+    //std::cout << " >> change_lane_cost = " << clc << std::endl;
     return dfgl + ic + cc + bc + clc;
 }
 
@@ -53,13 +53,13 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
     vector<double> accels;
     double closest_approach = 9999999;
     int collides = -1;
-    auto filtered = filter_predictions_by_lane(predictions, proposed_lane);
+    //auto filtered = filter_predictions_by_lane(predictions, proposed_lane);
 
     for (int i = 1; i <= PLANNING_HORIZON && i < trajectory.size(); ++i)
     {
         auto snapshot = trajectory[i];
         accels.push_back(snapshot.a);
-        for (auto f = filtered.begin(); f != filtered.end(); ++f)
+        for (auto f = predictions.begin(); f != predictions.end(); ++f)
         {
             if (i >= f->second.size())
             {
@@ -83,7 +83,7 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
             }
         }
     }
-    cout << "Closest approach: " << closest_approach << endl;
+    //cout << "Closest approach: " << closest_approach << endl;
     double max_accel = accels[0];
     double rms_acceleration = 0;
     for (int i = 0; i < accels.size(); ++i)
@@ -162,12 +162,12 @@ double Vehicle::collision_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 {
     if (data.collides != -1)
     {
-        std::cout << "    >> data.collides: " << data.collides << endl;
+        //std::cout << "    >> data.collides: " << data.collides << endl;
         double exponent = pow(data.collides, 2);
-        std::cout << "    >> exponent: " << exponent << endl;
+        //std::cout << "    >> exponent: " << exponent << endl;
         double multiplier = exp(-exponent);
-        std::cout << "    >> multiplier: " << multiplier << endl;
-        std::cout << "    >> COLLISION: " << COLLISION << endl;
+        //std::cout << "    >> multiplier: " << multiplier << endl;
+        //std::cout << "    >> COLLISION: " << COLLISION << endl;
         return multiplier * COLLISION;
     }
     return 0;
@@ -180,18 +180,18 @@ double Vehicle::buffer_cost(vector<Vehicle> trajectory, map<int, vector<vector<d
         return 10 * DANGER;
     }
     double timesteps_away = double(data.closest_approach) / data.avg_speed;
-    std::cout << "    >> data.closest_approach: " << data.closest_approach << endl;
-    std::cout << "    >> data.avg_speed: " << data.avg_speed << endl;
-    std::cout << "    >> timesteps_away: " << timesteps_away << endl;
-    std::cout << "    >> DESIRED_BUFFER: " << DESIRED_BUFFER << endl;
+    //std::cout << "    >> data.closest_approach: " << data.closest_approach << endl;
+    //std::cout << "    >> data.avg_speed: " << data.avg_speed << endl;
+    //std::cout << "    >> timesteps_away: " << timesteps_away << endl;
+    //std::cout << "    >> DESIRED_BUFFER: " << DESIRED_BUFFER << endl;
     if (timesteps_away > DESIRED_BUFFER)
     {
         return 0;
     }
-    std::cout << "    >> (timesteps_away / DESIRED_BUFFER): " << (timesteps_away / DESIRED_BUFFER) << endl;
+    //std::cout << "    >> (timesteps_away / DESIRED_BUFFER): " << (timesteps_away / DESIRED_BUFFER) << endl;
     double multiplier = 1.0 - pow((timesteps_away / DESIRED_BUFFER), 2);
-    std::cout << "    >> multiplier: " << multiplier << endl;
-    std::cout << "    >> DANGER: " << DANGER << endl;
+    //std::cout << "    >> multiplier: " << multiplier << endl;
+    //std::cout << "    >> DANGER: " << DANGER << endl;
     return multiplier * DANGER;
 }
 
@@ -224,6 +224,16 @@ map<int, vector<vector<double>>> deep_copy(map<int, vector<vector<double>>> pred
         pred_copy.insert({p->first, q_copy});
     }
     return pred_copy;
+}
+
+vector<Vehicle> deep_copy(vector<Vehicle> trajectory)
+{
+    vector<Vehicle> trajectory_copy;
+    for (auto v = trajectory.begin(); v != trajectory.end(); ++v)
+    {
+        trajectory_copy.push_back(*v);
+    }
+    return trajectory_copy;
 }
 
 vector<string> get_possible_states(Vehicle* v, bool usePrepareStates=true)
@@ -295,15 +305,18 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
     map<string, double> costs;
     for (auto s = states.begin(); s != states.end(); s++)
     {
-        vector<Vehicle> trajectories;
+        vector<vector<Vehicle>> trajectories;
         auto simil0 = this->clone();
         simil0.state = *s;
         auto pred_copy = deep_copy(predictions);
         simil0.realize_state(pred_copy);
-        trajectories.push_back(simil0.clone());
+        simil0.increment(1);
+        // seed the trajectories with the simil0
+        trajectories.push_back({ simil0.clone() });
         for (int i = 1; i <= horizon; ++i)
         {
             // pop the closest level of predictions from pred copy
+            //std::cout << "pop the closest level of predictions from pred copy" << std::endl;
             for (auto p = pred_copy.begin(); p != pred_copy.end(); ++p)
             {
                 auto pv = p->second;
@@ -313,30 +326,55 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
                     pv.erase(pv.begin());
                 }
             }
-            // fan out all possible states at this future state, when different from "KL"
-            if (*s != "KL")
+            // extend each of the known trajectories at this horizon step
+            //std::cout << "extend each of the known trajectories at this horizon step" << std::endl;
+            vector<vector<Vehicle>> new_trajectories;
+            for (auto trajectory = trajectories.begin(); trajectory != trajectories.end(); ++trajectory)
             {
-                auto simil_states = get_possible_states(&simil0);
-                for (auto s1 = states.begin(); s1 != states.end(); s1++)
+                // get a simil cloned from the last vehicle in the trajectory
+                //std::cout << "get a simil cloned from the last vehicle in the trajectory" << std::endl;
+                auto simil1 = trajectory->back().clone();
+                // fan out all possible states at this future state
+                //std::cout << "fan out all possible states at this future state" << std::endl;
+                auto simil_states = get_possible_states(&simil1);
+                for (auto s1 = simil_states.begin(); s1 != simil_states.end(); s1++)
                 {
-                    auto simil1 = simil0.clone();
-                    simil1.state = *s1;
-                    simil1.realize_state(pred_copy);
-                    trajectories.push_back(simil1.clone());
+                    if (*s1 != "KL")
+                    {
+                        // this is a different trajectory branch, extend our trajectories set
+                        //std::cout << "this is a different trajectory branch, extend our trajectories set" << std::endl;
+                        auto new_trajectory_branch = deep_copy(*trajectory);
+                        auto simil2 = simil1.clone();
+                        simil2.goal_lane = simil2.lane;
+                        simil2.state = *s1;
+                        simil2.realize_state(pred_copy);
+                        simil2.increment(1);
+                        new_trajectory_branch.push_back(simil2);
+                        new_trajectories.push_back(new_trajectory_branch);
+                    }
                 }
+                // extend the current trajectory by the "KL" branch
+                //std::cout << "extend the current trajectory by the \"KL\" branch" << std::endl;
+                simil1.goal_lane = simil1.lane;
+                simil1.state = "KL";
+                simil1.realize_state(pred_copy);
+                simil1.increment(1);
+                trajectory->push_back(simil1);
             }
-            // extend the trajectory by the "KL" branch
-            simil0.goal_lane = simil0.lane;
-            simil0.state = "KL";
-            simil0.realize_state(pred_copy);
-            simil0.increment(1);
-            simil0.state = *s;
-            trajectories.push_back(simil0.clone());
+            // add new fanned-out trajectories to the trajectory set for this state
+            //std::cout << "add new fanned-out trajectories to the trajectory set for this state" << std::endl;
+            for (auto trajectory = new_trajectories.begin(); trajectory != new_trajectories.end(); ++trajectory)
+            {
+                trajectories.push_back(*trajectory);
+            }
         }
-        std::cout << std::endl << "Possible state: " << *s << std::endl;
-        auto cost = calculate_cost(trajectories, predictions);
-        std::cout << "Possible cost: " << cost << std::endl << std::endl;
-        costs.insert({*s, cost});
+        //std::cout << std::endl << "Possible state: " << *s << std::endl;
+        for (auto trajectory = trajectories.begin(); trajectory != trajectories.end(); ++trajectory)
+        {
+            auto cost = calculate_cost(*trajectory, predictions);
+            //std::cout << "Possible cost: " << cost << std::endl << std::endl;
+            costs.insert({*s, cost});
+        }
     }
     string newState = states[0];
     for (auto s = states.begin(); s != states.end(); s++)
