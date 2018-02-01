@@ -551,6 +551,10 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions
         double available_room = separation_next - PREFERRED_BUFFER;
         max_acc = min(max_acc, available_room);
     }
+    if (max_acc < 0)
+    {
+        max_acc = max(max_acc, -max_acceleration);
+    }
     return max_acc;
 }
 
@@ -587,9 +591,12 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predicti
     {
         delta = 1;
     }
-    int lane = this->lane + delta;
+    int proposed_lane = this->lane + delta;
+    double proposed_lane_a = _max_accel_for_lane(predictions, proposed_lane, this->s);
+    double current_lane_a = _max_accel_for_lane(predictions, this->lane, this->s);
+    this->a = min(proposed_lane_a, current_lane_a);
 
-    map<int, vector<vector<double>>>::iterator it = predictions.begin();
+    /*map<int, vector<vector<double>>>::iterator it = predictions.begin();
     vector<vector<vector<double>>> at_behind;
     while (it != predictions.end())
     {
@@ -653,7 +660,7 @@ void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predicti
     if (this->a > current_lane_a)
     {
         this->a = current_lane_a;
-    }
+    }*/
 }
 
 vector<vector<double>> Vehicle::generate_predictions(int horizon)

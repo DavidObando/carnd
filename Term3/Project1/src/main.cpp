@@ -223,13 +223,14 @@ int main()
     Vehicle ego(lane, s, v, a);
     double target_vel = toMetersPerSecond(49.85);
     int lanes_available = 3;
-    double max_acceleration = 5;
+    double max_acceleration = 10;
     ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
     ego.last_update = std::chrono::system_clock::now();
+    bool is_initialized = false;
 
     map<int, Vehicle> other_vehicles;
 
-    h.onMessage([&map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
+    h.onMessage([&is_initialized, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
         (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
@@ -250,6 +251,11 @@ int main()
 
                 if (event == "telemetry")
                 {
+                    if (!is_initialized)
+                    {
+                        ego.last_update = std::chrono::system_clock::now();
+                        is_initialized = true;
+                    }
                     // j[1] is the data JSON object
 
                     // Main car's localization Data
@@ -279,14 +285,17 @@ int main()
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
                     if (egodt.count() >= 1) // refresh the path planning after this amount of seconds
                     {
+                        if (ego.v == 0)
+                        {
+                            ego.v = car_speed;
+                        }
                         ego.s = car_s;
-                        ego.v = car_speed;
                         ego.goal_s = ego.s + 200;
                         ego.last_update = right_now;
                         /*std::cout << "Ego speed: " << ego.v << std::endl;
                         std::cout << "Ego acceleration: " << ego.a << std::endl;
                         std::cout << "Ego DT: " << egodt.count() << std::endl;*/
-                        std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << "]" << std::endl;
+                        std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << ",a:" << ego.a << "]" << std::endl;
 
                         // update car map
                         map<int, vector<vector<double>>> predictions;
@@ -295,8 +304,9 @@ int main()
                         {
                             int check_car_id = sensor_fusion[i][0];
                             double check_car_s = sensor_fusion[i][5];
-                            if (check_car_s < (ego.s - 200) || check_car_s > (ego.s + 200))
+                            if (check_car_s < (ego.s - 70) || check_car_s > (ego.s + 130))
                             {
+                                // we're only "seeing" 70 meters back and 130 meters ahead
                                 // this car is too far back or too far ahead to matter, skip
                                 continue;
                             }
@@ -304,7 +314,7 @@ int main()
                             double check_car_vy = sensor_fusion[i][4];
                             double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
                             int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
-                            std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << "]" << std::endl;
+                            std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << ",a:0]" << std::endl;
                             /*std::cout << "check_car_id: " << check_car_id << std::endl;
                             std::cout << "check_car_vx: " << check_car_vx << std::endl;
                             std::cout << "check_car_vy: " << check_car_vy << std::endl;
@@ -458,7 +468,8 @@ int main()
 
                     double div = ego.v * 0.02;
                     double N = fabs(div) > 0.01 ? target_dist / div : 3000.0;
-                    /*std::cout << "target_x: " << target_x << std::endl;
+                    /*std::cout << "Post Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << ",a:" << ego.a << "]" << std::endl;
+                    std::cout << "target_x: " << target_x << std::endl;
                     std::cout << "target_y: " << target_y << std::endl;
                     std::cout << "target_dist: " << target_dist << std::endl;
                     std::cout << "N: " << N << std::endl;*/
@@ -466,6 +477,7 @@ int main()
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
                     double frenet_x_point = 0.0;
                     double x_add_on = target_x / N;
+                    std::cout << "x_add_on: " << x_add_on << std::endl;
                     while (next_x_vals.size() <= 50)
                     {
                         double x_point = frenet_x_point + x_add_on;
