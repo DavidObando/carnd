@@ -422,11 +422,8 @@ int main()
                                 projected_s = projected_s - MAX_S;
                             }
                             vector<double> next_wp = getXY(projected_s, toD(ego.lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                            if (next_wp[0] > ptsx[ptsx.size() - 1])
-                            {
-                                ptsx.push_back(next_wp[0]);
-                                ptsy.push_back(next_wp[1]);
-                            }
+                            ptsx.push_back(next_wp[0]);
+                            ptsy.push_back(next_wp[1]);
                         }
                     }
 
@@ -438,6 +435,36 @@ int main()
 
                         ptsx[i] = (shift_x * cos(0 - ref_yaw)) - (shift_y * sin(0 - ref_yaw));
                         ptsy[i] = (shift_x * sin(0 - ref_yaw)) + (shift_y * cos(0 - ref_yaw));
+                    }
+
+                    if (ptsx.size() <= 2)
+                    {
+                        // DEBUG MODE
+                        std::cout << "Found anomaly" << std::endl;
+                        std::cout << "MAX_S: " << MAX_S << std::endl;
+                        std::cout << "end_path_s: " << end_path_s << std::endl;
+                        for (int i = 0; i < ptsx.size(); ++i)
+                        {
+                            std::cout << "ptsx[" << i << "]: " << ptsx[i]<< std::endl;
+                            std::cout << "ptsy[" << i << "]: " << ptsy[i]<< std::endl;
+                        }
+                        std::cout << "Ego: " << std::endl << ego.display() << std::endl;
+                        for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
+                        {
+                            for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
+                            {
+                                double projected_s = end_path_s + i;
+                                std::cout << "projected_s: " << projected_s << std::endl;
+                                if (projected_s > MAX_S)
+                                {
+                                    projected_s = projected_s - MAX_S;
+                                    std::cout << "projected_s (corrected for MAX_S): " << projected_s << std::endl;
+                                }
+                                vector<double> next_wp = getXY(projected_s, toD(ego.lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                                std::cout << "next_wp[x]: " << next_wp[0]<< std::endl;
+                                std::cout << "next_wp[y]: " << next_wp[1]<< std::endl;
+                            }
+                        }
                     }
 
                     // create a spline
