@@ -122,7 +122,7 @@ private:
     static const int DESIRED_BUFFER = 4; // timesteps
     static const int PLANNING_HORIZON = 3;
     static const int KEEP_LANE_PREFERRED_BUFFER = 20;
-    static const int CHECK_COLLISION_PREFERRED_BUFFER = 10;
+    static const int CHECK_COLLISION_PREFERRED_BUFFER = 20;
 
     static const long long REACH_GOAL = pow(10, 1);
     static const long long EFFICIENCY = pow(10, 2);

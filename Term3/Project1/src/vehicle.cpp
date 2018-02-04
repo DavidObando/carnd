@@ -32,7 +32,7 @@ double Vehicle::calculate_cost(vector<Vehicle> trajectory, map<int, vector<vecto
     //std::cout << " >> inefficiency_cost = " << ic << std::endl;
     double cc = collision_cost(trajectory, predictions, trajectory_data);
     //std::cout << " >> collision_cost = " << cc << std::endl;
-    double bc = buffer_cost(trajectory, predictions, trajectory_data);
+    double bc = 0;//buffer_cost(trajectory, predictions, trajectory_data);
     //std::cout << " >> buffer_cost = " << bc << std::endl;
     double clc = change_lane_cost(trajectory, predictions, trajectory_data);
     //std::cout << " >> change_lane_cost = " << clc << std::endl;
@@ -130,8 +130,11 @@ map<int, vector<vector<double>>> Vehicle::filter_predictions_by_lane(map<int, ve
 
 bool Vehicle::check_collision(Vehicle snapshot, double s_previous, double s_now)
 {
-    auto v_target = s_now - s_previous;
-    if (s_previous < snapshot.s)
+    if (abs(s_now - snapshot.s) <= CHECK_COLLISION_PREFERRED_BUFFER)
+    {
+        return true;
+    }
+    if (s_previous <= snapshot.s)
     {
         return s_now >= (snapshot.s - CHECK_COLLISION_PREFERRED_BUFFER);
     }
@@ -141,6 +144,7 @@ bool Vehicle::check_collision(Vehicle snapshot, double s_previous, double s_now)
     }
     if (s_previous >= (snapshot.s - CHECK_COLLISION_PREFERRED_BUFFER))
     {
+        auto v_target = s_now - s_previous;
         return v_target > snapshot.v;
     }
     return false;
@@ -550,20 +554,28 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions
 
     map<int, vector<vector<double>>>::iterator it = predictions.begin();
     vector<vector<vector<double>>> in_front;
+    vector<vector<vector<double>>> behind_in_proximity;
     while (it != predictions.end())
     {
         vector<vector<double>> v = it->second;
 
-        if ((v[0][0] == lane) && (v[0][1] > s))
+        if (v[0][0] == lane)
         {
-            in_front.push_back(v);
+            if ((v[0][1] > s))
+            {
+                in_front.push_back(v);
+            }
+            else if ((v[0][1] >= s - KEEP_LANE_PREFERRED_BUFFER))
+            {
+                behind_in_proximity.push_back(v);
+            }
         }
         it++;
     }
 
     if (in_front.size() > 0)
     {
-        int min_s = 1000;
+        int min_s = 100000;
         vector<vector<double>> leading = {};
         for (int i = 0; i < in_front.size(); i++)
         {
@@ -579,6 +591,25 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions
         double separation_next = next_pos - my_next;
         double available_room = separation_next - KEEP_LANE_PREFERRED_BUFFER;
         max_acc = min(max_acc, available_room);
+    }
+    if (behind_in_proximity.size() > 0)
+    {
+        int max_s = -100000;
+        vector<vector<double>> trailing = {};
+        for (int i = 0; i < behind_in_proximity.size(); i++)
+        {
+            if ((behind_in_proximity[i][0][1] - s) > max_s)
+            {
+                max_s = (behind_in_proximity[i][0][1] - s);
+                trailing = behind_in_proximity[i];
+            }
+        }
+
+        double next_pos = trailing[1][1];
+        double my_next = s + this->v;
+        double separation_next = my_next - next_pos;
+        double available_room = separation_next - KEEP_LANE_PREFERRED_BUFFER;
+        max_acc = max(max_acc, available_room);
     }
     if (max_acc < 0)
     {
