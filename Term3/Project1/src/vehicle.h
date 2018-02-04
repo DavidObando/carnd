@@ -107,7 +107,7 @@ public:
         return c;
     };
 
-    double calculate_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions);
+    double calculate_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, string state);
     TrajectoryData get_helper_data(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions);
     map<int,vector<vector<double>>> filter_predictions_by_lane(map<int,vector<vector<double>>> predictions, int lane);
     bool check_collision(Vehicle snapshot, double s_previous, double s_now);
@@ -116,12 +116,13 @@ public:
     double collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double buffer_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
+    double state_cost(string state);
 
 private:
     static const int DESIRED_BUFFER = 4; // timesteps
     static const int PLANNING_HORIZON = 3;
     static const int KEEP_LANE_PREFERRED_BUFFER = 20;
-    static const int CHECK_COLLISION_PREFERRED_BUFFER = 6;
+    static const int CHECK_COLLISION_PREFERRED_BUFFER = 10;
 
     static const long long REACH_GOAL = pow(10, 1);
     static const long long EFFICIENCY = pow(10, 2);

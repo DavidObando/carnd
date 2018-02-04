@@ -23,20 +23,21 @@ Vehicle::Vehicle(int lane, double s, double v, double a)
 
 Vehicle::~Vehicle() {}
 
-double Vehicle::calculate_cost(vector<Vehicle> trajectory, map<int, vector<vector<double>>> predictions)
+double Vehicle::calculate_cost(vector<Vehicle> trajectory, map<int, vector<vector<double>>> predictions, string state)
 {
     auto trajectory_data = get_helper_data(trajectory, predictions);
     double dfgl = distance_from_goal_lane(trajectory, predictions, trajectory_data);
-    std::cout << " >> distance_from_goal_lane = " << dfgl << std::endl;
+    //std::cout << " >> distance_from_goal_lane = " << dfgl << std::endl;
     double ic = inefficiency_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> inefficiency_cost = " << ic << std::endl;
+    //std::cout << " >> inefficiency_cost = " << ic << std::endl;
     double cc = collision_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> collision_cost = " << cc << std::endl;
+    //std::cout << " >> collision_cost = " << cc << std::endl;
     double bc = buffer_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> buffer_cost = " << bc << std::endl;
+    //std::cout << " >> buffer_cost = " << bc << std::endl;
     double clc = change_lane_cost(trajectory, predictions, trajectory_data);
-    std::cout << " >> change_lane_cost = " << clc << std::endl;
-    return dfgl + ic + cc + bc + clc;
+    //std::cout << " >> change_lane_cost = " << clc << std::endl;
+    double sc = state_cost(state);
+    return dfgl + ic + cc + bc + clc + sc;
 }
 
 TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vector<vector<double>>> predictions)
@@ -53,13 +54,12 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
     vector<double> accels;
     double closest_approach = 9999999;
     int collides = -1;
-    auto filtered = filter_predictions_by_lane(predictions, proposed_lane);
 
     for (int i = 1; i <= PLANNING_HORIZON && i < trajectory.size(); ++i)
     {
         auto snapshot = trajectory[i];
         accels.push_back(snapshot.a);
-        for (auto f = filtered.begin(); f != filtered.end(); ++f)
+        for (auto f = predictions.begin(); f != predictions.end(); ++f)
         {
             if (i >= f->second.size())
             {
@@ -67,9 +67,14 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
                 // vehicle being observed
                 continue;
             }
-            auto state = f->second[i];
-            auto last_state = f->second[i - 1];
             // state is: 0: lane, 1: s, 2: v, 3: a
+            auto state = f->second[i];
+            if (state[0] != snapshot.lane)
+            {
+                // car is in a different lane
+                continue;
+            }
+            auto last_state = f->second[i - 1];
             bool vehicle_collides = check_collision(snapshot, last_state[1], state[1]);
             if (collides == -1 && vehicle_collides)
             {
@@ -162,12 +167,12 @@ double Vehicle::collision_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 {
     if (data.collides != -1)
     {
-        std::cout << "    >> data.collides: " << data.collides << endl;
+        //std::cout << "    >> data.collides: " << data.collides << endl;
         double exponent = pow(data.collides, 2);
-        std::cout << "    >> exponent: " << exponent << endl;
+        //std::cout << "    >> exponent: " << exponent << endl;
         double multiplier = exp(-exponent);
-        std::cout << "    >> multiplier: " << multiplier << endl;
-        std::cout << "    >> COLLISION: " << COLLISION << endl;
+        //std::cout << "    >> multiplier: " << multiplier << endl;
+        //std::cout << "    >> COLLISION: " << COLLISION << endl;
         return multiplier * COLLISION;
     }
     return 0;
@@ -202,6 +207,27 @@ double Vehicle::change_lane_cost(vector<Vehicle> trajectory, map<int, vector<vec
     if (data.end_lanes_from_goal > 0)
     {
         return COMFORT;
+    }
+    return 0;
+}
+
+double Vehicle::state_cost(string state)
+{
+    if (state.compare("CS") == 0)
+    {
+        return -EFFICIENCY;
+    }
+    else if (state.compare("KL") == 0)
+    {
+        return -EFFICIENCY;
+    }
+    else if (state.compare("PLCL") == 0)
+    {
+        return EFFICIENCY;
+    }
+    else if (state.compare("PLCR") == 0)
+    {
+        return EFFICIENCY;
     }
     return 0;
 }
@@ -345,7 +371,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
                         //std::cout << "this is a different trajectory branch, extend our trajectories set" << std::endl;
                         auto new_trajectory_branch = deep_copy(*trajectory);
                         auto simil2 = simil1.clone();
-                        simil2.goal_lane = simil2.lane;
+                        //simil2.goal_lane = simil2.lane;
                         simil2.state = *s1;
                         simil2.realize_state(pred_copy);
                         simil2.increment(1);
@@ -355,7 +381,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
                 }
                 // extend the current trajectory by the "KL" branch
                 //std::cout << "extend the current trajectory by the \"KL\" branch" << std::endl;
-                simil1.goal_lane = simil1.lane;
+                //simil1.goal_lane = simil1.lane;
                 simil1.state = "KL";
                 simil1.realize_state(pred_copy);
                 simil1.increment(1);
@@ -372,8 +398,8 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
         double lowestCost = (double)INFINITY_COST;
         for (auto trajectory = trajectories.begin(); trajectory != trajectories.end(); ++trajectory)
         {
-            auto cost = calculate_cost(*trajectory, predictions);
-            std::cout << "State " << *s << " has a cost of: " << cost << std::endl;
+            auto cost = calculate_cost(*trajectory, predictions, *s);
+            //std::cout << "State " << *s << " has a cost of: " << cost << std::endl;
             if (cost < lowestCost)
             {
                 lowestCost = cost;
