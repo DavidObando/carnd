@@ -27,15 +27,15 @@ double Vehicle::calculate_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 {
     auto trajectory_data = get_helper_data(trajectory, predictions);
     double dfgl = distance_from_goal_lane(trajectory, predictions, trajectory_data);
-    //std::cout << " >> distance_from_goal_lane = " << dfgl << std::endl;
+    std::cout << " >> distance_from_goal_lane = " << dfgl << std::endl;
     double ic = inefficiency_cost(trajectory, predictions, trajectory_data);
-    //std::cout << " >> inefficiency_cost = " << ic << std::endl;
+    std::cout << " >> inefficiency_cost = " << ic << std::endl;
     double cc = collision_cost(trajectory, predictions, trajectory_data);
-    //std::cout << " >> collision_cost = " << cc << std::endl;
+    std::cout << " >> collision_cost = " << cc << std::endl;
     double bc = buffer_cost(trajectory, predictions, trajectory_data);
-    //std::cout << " >> buffer_cost = " << bc << std::endl;
+    std::cout << " >> buffer_cost = " << bc << std::endl;
     double clc = change_lane_cost(trajectory, predictions, trajectory_data);
-    //std::cout << " >> change_lane_cost = " << clc << std::endl;
+    std::cout << " >> change_lane_cost = " << clc << std::endl;
     return dfgl + ic + cc + bc + clc;
 }
 
@@ -53,13 +53,13 @@ TrajectoryData Vehicle::get_helper_data(vector<Vehicle> trajectory, map<int, vec
     vector<double> accels;
     double closest_approach = 9999999;
     int collides = -1;
-    //auto filtered = filter_predictions_by_lane(predictions, proposed_lane);
+    auto filtered = filter_predictions_by_lane(predictions, proposed_lane);
 
     for (int i = 1; i <= PLANNING_HORIZON && i < trajectory.size(); ++i)
     {
         auto snapshot = trajectory[i];
         accels.push_back(snapshot.a);
-        for (auto f = predictions.begin(); f != predictions.end(); ++f)
+        for (auto f = filtered.begin(); f != filtered.end(); ++f)
         {
             if (i >= f->second.size())
             {
@@ -128,13 +128,13 @@ bool Vehicle::check_collision(Vehicle snapshot, double s_previous, double s_now)
     auto v_target = s_now - s_previous;
     if (s_previous < snapshot.s)
     {
-        return s_now >= snapshot.s;
+        return s_now >= (snapshot.s - CHECK_COLLISION_PREFERRED_BUFFER);
     }
     if (s_previous > snapshot.s)
     {
-        return s_now <= snapshot.s;
+        return s_now <= (snapshot.s + CHECK_COLLISION_PREFERRED_BUFFER);
     }
-    if (s_previous == snapshot.s)
+    if (s_previous >= (snapshot.s - CHECK_COLLISION_PREFERRED_BUFFER))
     {
         return v_target > snapshot.v;
     }
@@ -162,12 +162,12 @@ double Vehicle::collision_cost(vector<Vehicle> trajectory, map<int, vector<vecto
 {
     if (data.collides != -1)
     {
-        //std::cout << "    >> data.collides: " << data.collides << endl;
+        std::cout << "    >> data.collides: " << data.collides << endl;
         double exponent = pow(data.collides, 2);
-        //std::cout << "    >> exponent: " << exponent << endl;
+        std::cout << "    >> exponent: " << exponent << endl;
         double multiplier = exp(-exponent);
-        //std::cout << "    >> multiplier: " << multiplier << endl;
-        //std::cout << "    >> COLLISION: " << COLLISION << endl;
+        std::cout << "    >> multiplier: " << multiplier << endl;
+        std::cout << "    >> COLLISION: " << COLLISION << endl;
         return multiplier * COLLISION;
     }
     return 0;
@@ -369,12 +369,18 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             }
         }
         //std::cout << std::endl << "Possible state: " << *s << std::endl;
+        double lowestCost = (double)INFINITY_COST;
         for (auto trajectory = trajectories.begin(); trajectory != trajectories.end(); ++trajectory)
         {
             auto cost = calculate_cost(*trajectory, predictions);
-            //std::cout << "Possible cost: " << cost << std::endl << std::endl;
-            costs.insert({*s, cost});
+            std::cout << "State " << *s << " has a cost of: " << cost << std::endl;
+            if (cost < lowestCost)
+            {
+                lowestCost = cost;
+            }
         }
+        costs.insert({*s, lowestCost});
+        std::cout << "State " << *s << " has a lowest cost of: " << lowestCost << std::endl;
     }
     string newState = states[0];
     for (auto s = states.begin(); s != states.end(); s++)
@@ -384,16 +390,9 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             newState = *s;
         }
     }
-    if (this->state != newState)
-    {
-        std::cout << "Previous state: " << this->state << std::endl;
-        std::cout << "New state: " << newState << std::endl;
-        std::cout << "New state cost: " << costs[newState] << std::endl;
-    }
-    else
-    {
-        std::cout << "Current state: " << this->state << std::endl;
-    }
+    std::cout << "Previous state: " << this->state << std::endl;
+    std::cout << "New state: " << newState << std::endl;
+    std::cout << "New state cost: " << costs[newState] << std::endl;
     this->state = newState;
 }
 
@@ -452,7 +451,11 @@ bool Vehicle::collides_with(Vehicle other, int at_time)
     */
     vector<double> check1 = state_at(at_time);
     vector<double> check2 = other.state_at(at_time);
-    return (check1[0] == check2[0]) && (abs(check1[1] - check2[1]) <= L);
+    return
+        // both cars are in the same lane
+        (check1[0] == check2[0])
+        // the difference in s for both cars is less or equal to CHECK_COLLISION_PREFERRED_BUFFER
+        && (abs(check1[1] - check2[1]) <= CHECK_COLLISION_PREFERRED_BUFFER);
 }
 
 Vehicle::collider Vehicle::will_collide_with(Vehicle other, int timesteps)
@@ -548,7 +551,7 @@ double Vehicle::_max_accel_for_lane(map<int, vector<vector<double>>> predictions
         double next_pos = leading[1][1];
         double my_next = s + this->v;
         double separation_next = next_pos - my_next;
-        double available_room = separation_next - PREFERRED_BUFFER;
+        double available_room = separation_next - KEEP_LANE_PREFERRED_BUFFER;
         max_acc = min(max_acc, available_room);
     }
     if (max_acc < 0)

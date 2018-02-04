@@ -223,7 +223,7 @@ int main()
     Vehicle ego(lane, s, v, a);
     double target_vel = toMetersPerSecond(49.85);
     int lanes_available = 3;
-    double max_acceleration = 10;
+    double max_acceleration = 2;
     ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
     ego.last_update = std::chrono::system_clock::now();
     bool is_initialized = false;
@@ -477,7 +477,7 @@ int main()
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
                     double frenet_x_point = 0.0;
                     double x_add_on = target_x / N;
-                    std::cout << "x_add_on: " << x_add_on << std::endl;
+                    //std::cout << "x_add_on: " << x_add_on << std::endl;
                     while (next_x_vals.size() <= 50)
                     {
                         double x_point = frenet_x_point + x_add_on;

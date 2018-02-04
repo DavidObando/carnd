@@ -33,8 +33,6 @@ public:
         int  time; // time collision happens
     };
 
-    int L = 1;
-
     int lane;
 
     double s;
@@ -122,13 +120,15 @@ public:
 private:
     static const int DESIRED_BUFFER = 4; // timesteps
     static const int PLANNING_HORIZON = 3;
-    static const int PREFERRED_BUFFER = 20; // impacts "keep lane" behavior.
+    static const int KEEP_LANE_PREFERRED_BUFFER = 20;
+    static const int CHECK_COLLISION_PREFERRED_BUFFER = 6;
 
     static const long long REACH_GOAL = pow(10, 1);
     static const long long EFFICIENCY = pow(10, 2);
     static const long long COMFORT    = pow(10, 4);
     static const long long DANGER     = pow(10, 6);
     static const long long COLLISION  = pow(10, 8);
+    static const long long INFINITY_COST  = pow(10, 12);
 
 };
 
