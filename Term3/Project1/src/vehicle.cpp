@@ -533,6 +533,7 @@ void Vehicle::realize_lane_change(map<int, vector<vector<double>>> predictions, 
     {
         delta = 1;
     }
+    int previous_lane = this->lane;
     this->lane += delta;
     // ensure the new lane is still within boundaries
     if (this->lane >= this->lanes_available)
@@ -544,7 +545,9 @@ void Vehicle::realize_lane_change(map<int, vector<vector<double>>> predictions, 
         this->lane = 0;
     }
     this->goal_lane = this->lane;
-    this->a = _max_accel_for_lane(predictions, this->lane, this->s);
+    double previous_lane_a = _max_accel_for_lane(predictions, previous_lane, this->s);
+    double current_lane_a = _max_accel_for_lane(predictions, this->lane, this->s);
+    this->a = min(previous_lane_a, current_lane_a);
 }
 
 void Vehicle::realize_prep_lane_change(map<int, vector<vector<double>>> predictions, string direction)

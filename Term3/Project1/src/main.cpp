@@ -225,7 +225,7 @@ int main()
     double v = 0;
     double a = 0;
     Vehicle ego(lane, s, v, a);
-    double target_vel = toMetersPerSecond(48.85);
+    double target_vel = toMetersPerSecond(46.85);
     int lanes_available = 3;
     double max_acceleration = 1.6;
     ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
