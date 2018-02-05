@@ -6,8 +6,6 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include "Eigen-3.3/Eigen/Core"
-#include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 #include "spline.h"
 #include "vehicle.h"
@@ -307,10 +305,6 @@ int main()
                             ego.s = car_s;
                             ego.goal_s = ego.s + 200;
                             ego.last_update = right_now;
-                            /*std::cout << "Ego speed: " << ego.v << std::endl;
-                            std::cout << "Ego acceleration: " << ego.a << std::endl;
-                            std::cout << "Ego DT: " << egodt.count() << std::endl;*/
-                            std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << ",a:" << ego.a << "]" << std::endl;
 
                             // update car map
                             map<int, vector<vector<double>>> predictions;
@@ -329,23 +323,11 @@ int main()
                                 double check_car_vy = sensor_fusion[i][4];
                                 double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
                                 int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
-                                std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << ",a:0]" << std::endl;
-                                /*std::cout << "check_car_id: " << check_car_id << std::endl;
-                                std::cout << "check_car_vx: " << check_car_vx << std::endl;
-                                std::cout << "check_car_vy: " << check_car_vy << std::endl;
-                                std::cout << "check_car_v: " << check_car_v << std::endl;
-                                std::cout << "check_car_s: " << check_car_s << std::endl;
-                                std::cout << "check_car_d: " << check_car_d << std::endl;*/
+
                                 map<int, Vehicle>::iterator it;
                                 if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
                                 {
                                     auto delta_t = (right_now - it->second.last_update).count();
-                                    /*if (delta_t <= 5.0)
-                                    {
-                                        // we saw this dude less than 5 seconds ago, so use it
-                                        // to calculate its current acceleration
-                                        it->second.a = (check_car_v - it->second.v) / delta_t;
-                                    }*/
                                     it->second.a = 0; // assume zero acceleration
                                     it->second.v = check_car_v;
                                     it->second.s = check_car_s;
@@ -429,7 +411,6 @@ int main()
 
                     // In Frenet, add evenly spaced points ahead of the end of the previous path
                     vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
-                    //vector<vector<int>> wp_params = {{30,90,30}};
                     if (is_changing_lane)
                     {
                         wp_params = {{30,90,30}};
@@ -501,16 +482,10 @@ int main()
 
                     double div = ego.v * 0.02;
                     double N = fabs(div) > 0.01 ? target_dist / div : 3000.0;
-                    /*std::cout << "Post Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << ",a:" << ego.a << "]" << std::endl;
-                    std::cout << "target_x: " << target_x << std::endl;
-                    std::cout << "target_y: " << target_y << std::endl;
-                    std::cout << "target_dist: " << target_dist << std::endl;
-                    std::cout << "N: " << N << std::endl;*/
 
                     // Fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
                     double frenet_x_point = 0.0;
                     double x_add_on = target_x / N;
-                    //std::cout << "x_add_on: " << x_add_on << std::endl;
                     while (next_x_vals.size() <= 50)
                     {
                         double x_point = frenet_x_point + x_add_on;
@@ -531,7 +506,6 @@ int main()
                         next_x_vals.push_back(x_point);
                         next_y_vals.push_back(y_point);
                     }
-                    //std::cout << "Ego: " << std::endl << ego.display() << std::endl;
 
                     json msgJson;
                     msgJson["next_x"] = next_x_vals;
@@ -539,7 +513,6 @@ int main()
 
                     auto msg = "42[\"control\"," + msgJson.dump() + "]";
 
-                    //this_thread::sleep_for(chrono::milliseconds(1000));
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
             }

@@ -27,12 +27,6 @@ public:
 
 class Vehicle {
 public:
-
-    struct collider{
-        bool collision ; // is there a collision?
-        int  time; // time collision happens
-    };
-
     int lane;
 
     double s;
@@ -75,10 +69,6 @@ public:
 
     vector<double> state_at(int t);
 
-    bool collides_with(Vehicle other, int at_time);
-
-    collider will_collide_with(Vehicle other, int timesteps);
-
     void realize_state(map<int, vector < vector<double> > > predictions);
 
     void realize_constant_speed();
@@ -108,13 +98,11 @@ public:
     };
 
     double calculate_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, string state);
-    TrajectoryData get_helper_data(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, bool debug=false);
-    map<int,vector<vector<double>>> filter_predictions_by_lane(map<int,vector<vector<double>>> predictions, int lane);
+    TrajectoryData get_helper_data(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions);
     bool check_collision(Vehicle snapshot, double s_previous, double s_now);
     double distance_from_goal_lane(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double inefficiency_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
-    double collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data, bool debug=false);
-    double buffer_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
+    double collision_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double change_lane_cost(vector<Vehicle> trajectory, map<int,vector<vector<double>>> predictions, TrajectoryData data);
     double state_cost(string state);
 
