@@ -71,7 +71,7 @@ public:
 
     string display();
 
-    void increment(int dt);
+    void increment(double dt);
 
     vector<double> state_at(int t);
 
@@ -121,8 +121,8 @@ public:
 private:
     static const int PLANNING_HORIZON = 6;
     static const int KEEP_LANE_PREFERRED_BUFFER = 20;
-    static const int CHECK_COLLISION_PREFERRED_BUFFER_FRONT = 30;
-    static const int CHECK_COLLISION_PREFERRED_BUFFER_BACK = 8;
+    static const int CHECK_COLLISION_PREFERRED_BUFFER_FRONT = 40;
+    static const int CHECK_COLLISION_PREFERRED_BUFFER_BACK = 4;
 
     static const long long REACH_GOAL = pow(10, 1);
     static const long long EFFICIENCY = pow(10, 2);

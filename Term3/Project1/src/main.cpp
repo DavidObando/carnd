@@ -176,6 +176,11 @@ int toD(int lane)
     return (2 + (4 * lane));
 }
 
+bool inLane(double d)
+{
+    return (((int)d + 1) % 4) > 1;
+}
+
 // Waypoint map to read from
 const string map_file_ = "../data/highway_map.csv";
 // The max s value before wrapping around the track back to 0
@@ -221,16 +226,17 @@ int main()
     double v = 0;
     double a = 0;
     Vehicle ego(lane, s, v, a);
-    double target_vel = toMetersPerSecond(49.85);
+    double target_vel = toMetersPerSecond(45.85);
     int lanes_available = 3;
-    double max_acceleration = 2;
+    double max_acceleration = 1.6;
     ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
     ego.last_update = std::chrono::system_clock::now();
     bool is_initialized = false;
+    bool is_changing_lane = false;
 
     map<int, Vehicle> other_vehicles;
 
-    h.onMessage([&is_initialized, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
+    h.onMessage([&is_initialized, &is_changing_lane, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy, &ego, &other_vehicles]
         (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
@@ -285,88 +291,100 @@ int main()
                     std::chrono::duration<double> egodt = right_now - ego.last_update;
                     if (egodt.count() >= 1) // refresh the path planning after this amount of seconds
                     {
-                        if (ego.v == 0)
+                        if (is_changing_lane)
                         {
-                            ego.v = car_speed;
-                        }
-                        ego.s = car_s;
-                        ego.goal_s = ego.s + 200;
-                        ego.last_update = right_now;
-                        /*std::cout << "Ego speed: " << ego.v << std::endl;
-                        std::cout << "Ego acceleration: " << ego.a << std::endl;
-                        std::cout << "Ego DT: " << egodt.count() << std::endl;*/
-                        std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << ",a:" << ego.a << "]" << std::endl;
-
-                        // update car map
-                        map<int, vector<vector<double>>> predictions;
-                        predictions[-1] = ego.generate_predictions();
-                        for (int i = 0; i < sensor_fusion.size(); ++i)
-                        {
-                            int check_car_id = sensor_fusion[i][0];
-                            double check_car_s = sensor_fusion[i][5];
-                            if (check_car_s < (ego.s - 70) || check_car_s > (ego.s + 130))
+                            if (inLane(car_d))
                             {
-                                // we're only "seeing" 70 meters back and 130 meters ahead
-                                // this car is too far back or too far ahead to matter, skip
-                                continue;
+                                is_changing_lane = false;
                             }
-                            double check_car_vx = sensor_fusion[i][3];
-                            double check_car_vy = sensor_fusion[i][4];
-                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
-                            int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
-                            std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << ",a:0]" << std::endl;
-                            /*std::cout << "check_car_id: " << check_car_id << std::endl;
-                            std::cout << "check_car_vx: " << check_car_vx << std::endl;
-                            std::cout << "check_car_vy: " << check_car_vy << std::endl;
-                            std::cout << "check_car_v: " << check_car_v << std::endl;
-                            std::cout << "check_car_s: " << check_car_s << std::endl;
-                            std::cout << "check_car_d: " << check_car_d << std::endl;*/
-                            map<int, Vehicle>::iterator it;
-                            if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
+                        }
+                        else
+                        {
+                            if (ego.v == 0)
+                            {
+                                ego.v = car_speed;
+                            }
+                            ego.s = car_s;
+                            ego.goal_s = ego.s + 200;
+                            ego.last_update = right_now;
+                            /*std::cout << "Ego speed: " << ego.v << std::endl;
+                            std::cout << "Ego acceleration: " << ego.a << std::endl;
+                            std::cout << "Ego DT: " << egodt.count() << std::endl;*/
+                            std::cout << "Ego: [s:" << ego.s << ",d:" << ego.lane << ",v:" << ego.v << ",a:" << ego.a << "]" << std::endl;
+
+                            // update car map
+                            map<int, vector<vector<double>>> predictions;
+                            predictions[-1] = ego.generate_predictions();
+                            for (int i = 0; i < sensor_fusion.size(); ++i)
+                            {
+                                int check_car_id = sensor_fusion[i][0];
+                                double check_car_s = sensor_fusion[i][5];
+                                if (check_car_s < (ego.s - 70) || check_car_s > (ego.s + 130))
+                                {
+                                    // we're only "seeing" 70 meters back and 130 meters ahead
+                                    // this car is too far back or too far ahead to matter, skip
+                                    continue;
+                                }
+                                double check_car_vx = sensor_fusion[i][3];
+                                double check_car_vy = sensor_fusion[i][4];
+                                double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
+                                int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
+                                std::cout << "Car " << check_car_id << ": [s:" << check_car_s << ",d:" << check_car_d << ",v:"<< check_car_v << ",a:0]" << std::endl;
+                                /*std::cout << "check_car_id: " << check_car_id << std::endl;
+                                std::cout << "check_car_vx: " << check_car_vx << std::endl;
+                                std::cout << "check_car_vy: " << check_car_vy << std::endl;
+                                std::cout << "check_car_v: " << check_car_v << std::endl;
+                                std::cout << "check_car_s: " << check_car_s << std::endl;
+                                std::cout << "check_car_d: " << check_car_d << std::endl;*/
+                                map<int, Vehicle>::iterator it;
+                                if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
+                                {
+                                    auto delta_t = (right_now - it->second.last_update).count();
+                                    /*if (delta_t <= 5.0)
+                                    {
+                                        // we saw this dude less than 5 seconds ago, so use it
+                                        // to calculate its current acceleration
+                                        it->second.a = (check_car_v - it->second.v) / delta_t;
+                                    }*/
+                                    it->second.a = 0; // assume zero acceleration
+                                    it->second.v = check_car_v;
+                                    it->second.s = check_car_s;
+                                    it->second.lane = check_car_d;
+                                    // refresh instance in cache
+                                    it->second.last_update = right_now;
+                                    predictions[check_car_id] = it->second.generate_predictions();
+                                }
+                                else
+                                {
+                                    Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
+                                    check_car.last_update = right_now;
+                                    other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
+                                    predictions[check_car_id] = check_car.generate_predictions();
+                                }
+                            }
+                            // clean up the car cache
+                            vector<int> to_delete;
+                            // mark for deletion
+                            for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
                             {
                                 auto delta_t = (right_now - it->second.last_update).count();
-                                /*if (delta_t <= 5.0)
+                                if (delta_t > 5.0)
                                 {
-                                    // we saw this dude less than 5 seconds ago, so use it
-                                    // to calculate its current acceleration
-                                    it->second.a = (check_car_v - it->second.v) / delta_t;
-                                }*/
-                                it->second.a = 0; // assume zero acceleration
-                                it->second.v = check_car_v;
-                                it->second.s = check_car_s;
-                                it->second.lane = check_car_d;
-                                // refresh instance in cache
-                                it->second.last_update = right_now;
-                                predictions[check_car_id] = it->second.generate_predictions();
+                                    to_delete.push_back(it->first);
+                                }
                             }
-                            else
+                            // purge
+                            for (auto index = to_delete.begin(); index != to_delete.end(); ++index)
                             {
-                                Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
-                                check_car.last_update = right_now;
-                                other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
-                                predictions[check_car_id] = check_car.generate_predictions();
+                                other_vehicles.erase(*index);
                             }
-                        }
-                        // clean up the car cache
-                        vector<int> to_delete;
-                        // mark for deletion
-                        for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
-                        {
-                            auto delta_t = (right_now - it->second.last_update).count();
-                            if (delta_t > 5.0)
-                            {
-                                to_delete.push_back(it->first);
-                            }
-                        }
-                        // purge
-                        for (auto index = to_delete.begin(); index != to_delete.end(); ++index)
-                        {
-                            other_vehicles.erase(*index);
-                        }
 
-                        ego.update_state(predictions);
-                        ego.realize_state(predictions);
-                        ego.increment(egodt.count());
+                            auto initial_lane = ego.lane;
+                            ego.update_state(predictions);
+                            ego.realize_state(predictions);
+                            ego.increment(egodt.count());
+                            is_changing_lane = initial_lane != ego.lane;
+                        }
                     }
 
                     int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20);
@@ -412,6 +430,10 @@ int main()
                     // In Frenet, add evenly spaced points ahead of the end of the previous path
                     vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
                     //vector<vector<int>> wp_params = {{30,90,30}};
+                    if (is_changing_lane)
+                    {
+                        wp_params = {{30,90,30}};
+                    }
                     for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
                     {
                         for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
@@ -435,34 +457,18 @@ int main()
 
                         ptsx[i] = (shift_x * cos(0 - ref_yaw)) - (shift_y * sin(0 - ref_yaw));
                         ptsy[i] = (shift_x * sin(0 - ref_yaw)) + (shift_y * cos(0 - ref_yaw));
-                    }
 
-                    if (ptsx.size() <= 2)
-                    {
-                        // DEBUG MODE
-                        std::cout << "Found anomaly" << std::endl;
-                        std::cout << "MAX_S: " << MAX_S << std::endl;
-                        std::cout << "end_path_s: " << end_path_s << std::endl;
-                        for (int i = 0; i < ptsx.size(); ++i)
+                        if (i > 0)
                         {
-                            std::cout << "ptsx[" << i << "]: " << ptsx[i]<< std::endl;
-                            std::cout << "ptsy[" << i << "]: " << ptsy[i]<< std::endl;
-                        }
-                        std::cout << "Ego: " << std::endl << ego.display() << std::endl;
-                        for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
-                        {
-                            for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
+                            if (ptsx[i - 1] >= ptsx[i])
                             {
-                                double projected_s = end_path_s + i;
-                                std::cout << "projected_s: " << projected_s << std::endl;
-                                if (projected_s > MAX_S)
+                                std::cout << "Error!" << std::endl;
+                                std::cout << "i: " << i << std::endl;
+                                for (int j = 0; i < ptsx.size(); ++j)
                                 {
-                                    projected_s = projected_s - MAX_S;
-                                    std::cout << "projected_s (corrected for MAX_S): " << projected_s << std::endl;
+                                    std::cout << "ptsx[" << j << "]: " << ptsx[j] << std::endl;
+                                    std::cout << "ptsy[" << j << "]: " << ptsy[j] << std::endl;
                                 }
-                                vector<double> next_wp = getXY(projected_s, toD(ego.lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                                std::cout << "next_wp[x]: " << next_wp[0]<< std::endl;
-                                std::cout << "next_wp[y]: " << next_wp[1]<< std::endl;
                             }
                         }
                     }

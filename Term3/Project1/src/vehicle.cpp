@@ -419,8 +419,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             }
         }
         costs.insert({*s, lowestCost});
-        std::cout << "State " << *s << " has a lowest cost of: " << lowestCost << std::endl;
-        //if (*s == "LCR" || *s == "LCL")
+        /*std::cout << "State " << *s << " has a lowest cost of: " << lowestCost << std::endl;
         {
             auto trajectory_data = get_helper_data(lowest_cost_trajectory, predictions, true);
             double dfgl = distance_from_goal_lane(lowest_cost_trajectory, predictions, trajectory_data);
@@ -436,7 +435,7 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             double sc = state_cost(*s);
             std::cout << " >> state_cost = " << sc << std::endl;
             std::cout << " >> total = " << (dfgl + ic + cc + bc + clc + sc) << std::endl;
-        }
+        }*/
     }
     string newState = states[0];
     for (auto s = states.begin(); s != states.end(); s++)
@@ -446,9 +445,9 @@ void Vehicle::update_state(map<int, vector<vector<double>>> predictions, int hor
             newState = *s;
         }
     }
-    std::cout << "Previous state: " << this->state << std::endl;
+    /*std::cout << "Previous state: " << this->state << std::endl;
     std::cout << "New state: " << newState << std::endl;
-    std::cout << "New state cost: " << costs[newState] << std::endl;
+    std::cout << "New state cost: " << costs[newState] << std::endl;*/
     this->state = newState;
 }
 
@@ -484,7 +483,7 @@ string Vehicle::display()
     return oss.str();
 }
 
-void Vehicle::increment(int dt = 1)
+void Vehicle::increment(double dt = 1)
 {
     this->s += this->v * dt;
     this->v += this->a * dt;
