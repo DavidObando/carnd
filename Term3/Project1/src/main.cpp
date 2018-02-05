@@ -174,9 +174,10 @@ int toD(int lane)
     return (2 + (4 * lane));
 }
 
-bool inLane(double d)
+bool inLane(double d, int lane)
 {
-    return (((int)d + 1) % 4) > 1;
+    d -= toD(lane);
+    return d >= -0.5 & d <= 0.5;
 }
 
 // Waypoint map to read from
@@ -224,7 +225,7 @@ int main()
     double v = 0;
     double a = 0;
     Vehicle ego(lane, s, v, a);
-    double target_vel = toMetersPerSecond(45.85);
+    double target_vel = toMetersPerSecond(48.85);
     int lanes_available = 3;
     double max_acceleration = 1.6;
     ego.configure(target_vel, lanes_available, max_acceleration, lane, s + 200);
@@ -291,82 +292,79 @@ int main()
                     {
                         if (is_changing_lane)
                         {
-                            if (inLane(car_d))
+                            if (inLane(car_d, ego.lane))
                             {
                                 is_changing_lane = false;
                             }
                         }
-                        else
+                        if (ego.v == 0)
                         {
-                            if (ego.v == 0)
-                            {
-                                ego.v = car_speed;
-                            }
-                            ego.s = car_s;
-                            ego.goal_s = ego.s + 200;
-                            ego.last_update = right_now;
+                            ego.v = car_speed;
+                        }
+                        ego.s = car_s;
+                        ego.goal_s = ego.s + 200;
+                        ego.last_update = right_now;
 
-                            // update car map
-                            map<int, vector<vector<double>>> predictions;
-                            predictions[-1] = ego.generate_predictions();
-                            for (int i = 0; i < sensor_fusion.size(); ++i)
+                        // update car map
+                        map<int, vector<vector<double>>> predictions;
+                        predictions[-1] = ego.generate_predictions();
+                        for (int i = 0; i < sensor_fusion.size(); ++i)
+                        {
+                            int check_car_id = sensor_fusion[i][0];
+                            double check_car_s = sensor_fusion[i][5];
+                            if (check_car_s < (ego.s - 70) || check_car_s > (ego.s + 130))
                             {
-                                int check_car_id = sensor_fusion[i][0];
-                                double check_car_s = sensor_fusion[i][5];
-                                if (check_car_s < (ego.s - 70) || check_car_s > (ego.s + 130))
-                                {
-                                    // we're only "seeing" 70 meters back and 130 meters ahead
-                                    // this car is too far back or too far ahead to matter, skip
-                                    continue;
-                                }
-                                double check_car_vx = sensor_fusion[i][3];
-                                double check_car_vy = sensor_fusion[i][4];
-                                double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
-                                int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
-
-                                map<int, Vehicle>::iterator it;
-                                if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
-                                {
-                                    auto delta_t = (right_now - it->second.last_update).count();
-                                    it->second.a = 0; // assume zero acceleration
-                                    it->second.v = check_car_v;
-                                    it->second.s = check_car_s;
-                                    it->second.lane = check_car_d;
-                                    // refresh instance in cache
-                                    it->second.last_update = right_now;
-                                    predictions[check_car_id] = it->second.generate_predictions();
-                                }
-                                else
-                                {
-                                    Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
-                                    check_car.last_update = right_now;
-                                    other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
-                                    predictions[check_car_id] = check_car.generate_predictions();
-                                }
+                                // we're only "seeing" 70 meters back and 130 meters ahead
+                                // this car is too far back or too far ahead to matter, skip
+                                continue;
                             }
-                            // clean up the car cache
-                            vector<int> to_delete;
-                            // mark for deletion
-                            for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
+                            double check_car_vx = sensor_fusion[i][3];
+                            double check_car_vy = sensor_fusion[i][4];
+                            double check_car_v = sqrt((check_car_vx * check_car_vx) + (check_car_vy * check_car_vy));
+                            int check_car_d = (int)(((float)sensor_fusion[i][6]) / 4);
+
+                            map<int, Vehicle>::iterator it;
+                            if ((it = other_vehicles.find(check_car_id)) != other_vehicles.end())
                             {
                                 auto delta_t = (right_now - it->second.last_update).count();
-                                if (delta_t > 5.0)
-                                {
-                                    to_delete.push_back(it->first);
-                                }
+                                it->second.a = 0; // assume zero acceleration
+                                it->second.v = check_car_v;
+                                it->second.s = check_car_s;
+                                it->second.lane = check_car_d;
+                                // refresh instance in cache
+                                it->second.last_update = right_now;
+                                predictions[check_car_id] = it->second.generate_predictions();
                             }
-                            // purge
-                            for (auto index = to_delete.begin(); index != to_delete.end(); ++index)
+                            else
                             {
-                                other_vehicles.erase(*index);
+                                Vehicle check_car(check_car_d, check_car_s, check_car_v, 0);
+                                check_car.last_update = right_now;
+                                other_vehicles.insert(std::pair<int,Vehicle>(check_car_id, check_car));
+                                predictions[check_car_id] = check_car.generate_predictions();
                             }
-
-                            auto initial_lane = ego.lane;
-                            ego.update_state(predictions);
-                            ego.realize_state(predictions);
-                            ego.increment(egodt.count());
-                            is_changing_lane = initial_lane != ego.lane;
                         }
+                        // clean up the car cache
+                        vector<int> to_delete;
+                        // mark for deletion
+                        for (auto it = other_vehicles.begin(); it != other_vehicles.end(); ++it)
+                        {
+                            auto delta_t = (right_now - it->second.last_update).count();
+                            if (delta_t > 5.0)
+                            {
+                                to_delete.push_back(it->first);
+                            }
+                        }
+                        // purge
+                        for (auto index = to_delete.begin(); index != to_delete.end(); ++index)
+                        {
+                            other_vehicles.erase(*index);
+                        }
+
+                        auto initial_lane = ego.lane;
+                        ego.update_state(predictions);
+                        ego.realize_state(predictions);
+                        ego.increment(egodt.count());
+                        is_changing_lane = is_changing_lane || initial_lane != ego.lane;
                     }
 
                     int PREVIOUS_PATH_POINTS_TO_TAKE = (int)(ego.v > 20 ? ego.v : 20);
@@ -465,7 +463,7 @@ int main()
                     vector<double> next_y_vals;
 
                     // Start with previous path points from last time
-                    for (int i = 0; i < previous_path_x.size() && i < PREVIOUS_PATH_POINTS_TO_TAKE; ++i) 
+                    for (int i = 0; i < previous_path_x.size() && i < PREVIOUS_PATH_POINTS_TO_TAKE; ++i)
                     {
                         //Redefine reference state as previous path end point
                         ref_x = previous_path_x[i];
