@@ -2,7 +2,7 @@
 
 The goals / steps of this project are the following:
   * Design a path planner that is able to create smooth, safe paths for the car to follow along a 3-lane highway with traffic.
-  * A successful path planner will be able to keep inside its lane, avoid hitting other cars, and pass slower moving traffic all by using localization, sensor fusion, and map data.
+  * A successful path planner will be able to keep the vehicle inside its lane, avoid hitting other cars, and pass slower moving traffic all by using localization, sensor fusion, and map data.
 
 [//]: # (Image References)
 
@@ -236,7 +236,7 @@ The controller that was implemented for this project is somewhat naive and produ
 The controller was based on the [Path Planning Walkthrough video](https://www.youtube.com/watch?v=7sI3VHFPP0w) linked from the Path Planning project description in Udacity's website, following the strategies and suggestions given there.
 
 #### Difficulty of this project
-My main struggle with this project was making sense of the sensor fusion data, and ensuring that my model was completely fed by measurements in meters, as initially I produced a model that kept the top velocity in miles per hour (this was a mistake). After ironing out these inconsistencies, the next big challenge was to ensure I could effectively expand the trajectory tree, calculate the cost for each separate trajectory, and obtain the cheapest one. I can tell that the solution I produced can be greatly optimized. For example, if half of my trajectories reuse the first one or  still re-calculate the cost associated for each trajectory independently. I could transform the code to be based more on a greedy strategy where I don't have to re-compute costs associated to common trails of separate trajectories.
+My main struggle with this project was making sense of the sensor fusion data, and ensuring that my model was completely fed by measurements in meters, as initially I produced a model that kept the top velocity in miles per hour (this was a mistake). After ironing out these inconsistencies, the next big challenge was to ensure I could effectively expand the trajectory tree, calculate the cost for each separate trajectory, and obtain the cheapest one. I can tell that the solution I produced can be greatly optimized. For example, if half of my trajectories reuse the first one I still re-calculate the cost associated for each trajectory independently. I could transform the code to be based more on a greedy strategy where I don't have to re-compute costs associated to common trails of separate trajectories.
 
 Another challenge that I didn't quite complete was producing a more sophisticated controller. The one I delivered with this assignment is functional and does produce smooth lane changes as well as keeping the car in the lane at all times. That said, it would be interesting to mount a PID or MPC that manages the trajectory based on the output of the path planner. This isn't necessary for this assignment to hit all the rubric points, but in practice I don't see how a real self-driving car would do without a more complete controller that accounted for variables such as the dimensionality of the vehicle, tire and road conditions, and jerk minimizing strategies.
 
