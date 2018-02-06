@@ -1,7 +1,7 @@
 # Path Planning project
 
 The goals / steps of this project are the following:
-  * Design a path planner that is able to create smooth, safe paths for the car to follow along a 3 lane highway with traffic.
+  * Design a path planner that is able to create smooth, safe paths for the car to follow along a 3-lane highway with traffic.
   * A successful path planner will be able to keep inside its lane, avoid hitting other cars, and pass slower moving traffic all by using localization, sensor fusion, and map data.
 
 [//]: # (Image References)
@@ -76,7 +76,7 @@ Path planning then takes this value into account when producing an optimal value
 All these are combined to produce an optimal value that results in non-jerky acceleration, as well as car safety when approaching cars from behind or when attempting to change lanes.
 
 #### Max Acceleration and Jerk are not Exceeded.
-This path planning code reasons about acceleration, but uses a simplified model in which lane changes are immediate. Basically, it's a simplified model where acceleration is seen as a property of the `s` dimention but not of the `d` dimention, in Frenet coordinate speak. I separated the lane shifting acceleration problem to the controller and left the velocity acceleration problem to the path planner. This made my code very easy to work with for multiple reasons:
+This path planning code reasons about acceleration, but uses a simplified model in which lane changes are immediate. Basically, it's a simplified model where acceleration is seen as a property of the `s` dimension but not of the `d` dimension, in Frenet coordinate speak. I separated the lane shifting acceleration problem to the controller and left the velocity acceleration problem to the path planner. This made my code very easy to work with for multiple reasons:
   1. I could run deep simulations up to 6 seconds in the future using the predictions for all the other vehicles in this simplified world view.
   2. It was easy to use the `PLCL` and `PLCR` (prepare lane change left/right) states to prepare the vehicle's speed to safe lane changes.
   3. Lane switching in the controller could be easily smoothed out with heuristics.
@@ -107,7 +107,7 @@ for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
     }
 }
 ```
-What this accomplies is the spline to be very stiff closer to the origin while driving in a lane, but becoming more flexible while switching lanes. The `is_changing_lane` flag is set to `true` whenever the vehicle model changes lane (again, for the model it's an immediate action) and is set back to `false` after the vehicle has reached coordinates close to the center of the target lane.
+What this accomplishes is the spline to be very stiff closer to the origin while driving in a lane, but becoming more flexible while switching lanes. The `is_changing_lane` flag is set to `true` whenever the vehicle model changes lane (again, for the model it's an immediate action) and is set back to `false` after the vehicle has reached coordinates close to the center of the target lane.
 
 This simple heuristic allows for fine control over the path while driving on a specific lane, and soft, non-jerky transitions between lanes.
 
@@ -142,8 +142,8 @@ bool Vehicle::check_collision(Vehicle snapshot, double s_previous, double s_now)
 }
 ```
 The above code snippet is comparing the position of a future predicted state of `ego` (`snapshot.s`) against the predicted positions of another car (`s_previous` and `s_now`). We decide there's a collision in three separate cases:
-  1. When the other car was behind us, and is now 4 meters behind us or closer.
-  2. When the other car was ahead of us, and is now 40 meters ahead of us or closer.
+  1. When the other car was behind us and is now 4 meters behind us or closer.
+  2. When the other car was ahead of us and is now 40 meters ahead of us or closer.
   3. When the other car is behind us, closer than 4 meters, and its velocity is such that it will ram into us in the next timestep.
 
 Given these conditions we can imagine the safety boxes being drawn somewhat like this:
@@ -151,7 +151,7 @@ Given these conditions we can imagine the safety boxes being drawn somewhat like
 
 In effect, these safety boxes help determining if we can change lanes, and also what our cruising velocity can be, as we'll reduce our velocity so as to keep `ego` from crossing into the buffer area.
 
-As a corollary, it would be great if the simulator had other rendering facilities separate from the green bubbles that display the path. I would very much like to draw these safety boxes on the ground, as well as ramifications of all the paths that I'm evaluating and their related cost. This has been very hard to observe given the toolset for this assignment, and makes me wish for an improved version of the simulator that also takes other forms of data to display in real time.
+As a corollary, it would be great if the simulator had other rendering facilities separate from the green bubbles that display the path. I would very much like to draw these safety boxes on the ground, as well as ramifications of all the paths that I'm evaluating and their related cost. This has been very hard to observe given the toolset for this assignment and makes me wish for an improved version of the simulator that also takes other forms of data to display in real time.
 
 
 #### The car stays in its lane, except for the time between changing lanes.
@@ -168,10 +168,11 @@ Here's an example of these safety boxes in action while the car is attempting to
 
 ### Reflection
 
-The process to get here was iteritative, one in which I discovered and fixed issues one at a time. My starting point was the [Path Planning Walkthrough video](https://www.youtube.com/watch?v=7sI3VHFPP0w) linked from the Path Planning project description in Udacity's website. This allowed me to have basic control over the vehicle and to know where to begin with regards to the sensor fusion data.
+The process to get here was iterative, one in which I discovered and fixed issues one at a time. My starting point was the [Path Planning Walkthrough video](https://www.youtube.com/watch?v=7sI3VHFPP0w) linked from the Path Planning project description in Udacity's website. This allowed me to have basic control over the vehicle and to know where to begin with regards to the sensor fusion data.
 
 Next I started to work on separating the vehicle behavior from the basic controller code I already had. I did this by taking parts of the code I had produced for the behavior planning lab in lesson 4 of term 3 and adjusting it for my needs. The main evolution in this code compared with the lab is that this solution is truly a deep search of an optimal path that expands the action tree at every timestep, generating a large number of possible trajectories and selecting the one that yields the lowest cost.
 
+#### Trajectories tree expansion
 The original code simply selected a possible state (keep lane, lane change left, etc.) and proceeded to see what would happen 3 seconds in the future after executing this action. The outcome was a less-than-ideal and non-realistic representation of the future. The solution evolved to be what you see in `update_state` in `vehicle.cpp`. Here we're running a prediction engine that will go, 1 second at a time, up to 6 seconds in the future expanding the trajectories tree with all possible states at any given point.
 
 I wish I was able to visualize these trajectories in the simulator to overlay the potential trajectories and their cost as they were happening, but alas, this is not supported. Had I been able to visualize what was going on I would have seen something like:
@@ -182,40 +183,62 @@ This gives us a set of trajectories (or trajectory expansion) that roughly looks
 
 Lane   |   T=1 |   T=2 |   T=3 |   T=4 |
  ------------ | :-----------: | -----------: | -----------: | -----------: |
-Rightmost | KL, LCL | KL, LCL | KL, LCL | KL, LCL |
-Center | | KL, LCL, LCR | KL, LCL, LCR | KL, LCL, LCR |
-Leftmost | |  | KL, LCR | KL, LCR |
+Rightmost | `KL`, `LCL` | `KL`, `LCL` | `KL`, `LCL` | `KL`, `LCL` |
+Center | | `KL`, `LCL`, `LCR` | `KL`, `LCL`, `LCR` | `KL`, `LCL`, `LCR` |
+Leftmost | |  | `KL`, `LCR` | `KL`, `LCR` |
 
 At time T=1, rightmost lane:
-  - KL: We can stay in the same lane (red line)
-  - LCL: We can change lane to the left (yellow line)
+  - `KL`: We can stay in the same lane (red line)
+  - `LCL`: We can change lane to the left (yellow line)
 
 At time T=2, rightmost lane:
-  - KL: We can stay in the same lane (red line)
-  - LCL: We can change lane to the left (yellow line)
+  - `KL`: We can stay in the same lane (red line)
+  - `LCL`: We can change lane to the left (yellow line)
 
 At time T=2, center lane:
-  - KL: We can stay in the same lane (red line)
-  - LCL: We can change lane to the left (yellow line)
-  - LCR: We can change lane to the right (green line)
+  - `KL`: We can stay in the same lane (red line)
+  - `LCL`: We can change lane to the left (yellow line)
+  - `LCR`: We can change lane to the right (green line)
 
 At time T=3, rightmost lane:
-  - KL: We can stay in the same lane (red line)
-  - LCL: We can change lane to the left (yellow line)
+  - `KL`: We can stay in the same lane (red line)
+  - `LCL`: We can change lane to the left (yellow line)
 
 At time T=3, center lane:
-  - KL: We can stay in the same lane (red line)
-  - LCL: We can change lane to the left (yellow line)
-  - LCR: We can change lane to the right (green line)
+  - `KL`: We can stay in the same lane (red line)
+  - `LCL`: We can change lane to the left (yellow line)
+  - `LCR`: We can change lane to the right (green line)
 
 At time T=3, leftmost lane:
-  - KL: We can stay in the same lane (red line)
-  - LCR: We can change lane to the right (green line)
+  - `KL`: We can stay in the same lane (red line)
+  - `LCR`: We can change lane to the right (green line)
 
 T=4 expands the same way as T=3 for all lanes.
 
+In reality there are two more state: `PLCL` and `PLCR` that enable the car to do smooth lane changing by adjusting its velocity not only to the car in its current lane, but also to the velocity of cars in the lane to which we're planning to switch. I've omitted these states from the graphic and the table above as it makes things easier to visualize, even though it's technically different.
 
-This path expansion is truly powerful given that we can find the best (cheapest) trajectory that involves all possible operations up to 6 seconds in the future, and leverages the predictions of where the other vehicles will be to evaluate the cost of each of the possible trajectories independently. A trajectory that results in a crash will be too costly compared to a clean trajectory. Two equal trajectories will be untied by preferring to stay in the current lane so as to minimize discomfort to the vehicle passengers.
+This path expansion with individual trajectory costing is truly powerful given that we can find the best (cheapest) trajectory that involves all possible operations up to 6 seconds in the future, and leverages the predictions of where the other vehicles will be during the cost calculation of each of the possible trajectories independently. A trajectory that results in a crash will be too costly compared to a clean trajectory. Two equal trajectories will be untied by preferring to stay in the current lane so as to minimize discomfort to the vehicle passengers.
 
 The code can be greatly optimized for performance, but it's functional and can visibly generate predictions that are very approximate to what I as a driver would do.
 
+The cost evaluation for each trajectory is done by a sum of multiple factors:
+  - Distance from goal lane: as a way to afinitize the vehicle to its current lane on the long run.
+  - Inefficiency cost: as a way to penalize driving too slow.
+  - Collision cost: as a way to penalize collisions, the cost is higher the sooner the collision will occur.
+  - Change lane cost: a small penalty for changing lanes.
+  - State cost: rewards staying in the same lane, and unties prepare state to lane change state when both would otherwise yield the same cost (preferring change lane to perpetually staying in prepare).
+
+After the cost of each of the possible trajectories is calculated, we select the state at T=1 that leads to it. The trajectory could be a complete zigzag around other vehicles, but all we need to know is what state we want to start with and let the trajectory execution unroll the steps as the vehicle makes progress on the road.
+
+#### Vehicle controller
+The controller that was implemented for this project is somewhat naive and produces trajectories that allow all rubric points to be achieved. In particular, it takes the output from the path planner and observes what the lane and velocity should be according to it. If a lane change is detected, a lane change operation is started. Velocity is accounted for to determine the distribution of the path points that are to be sent to the simulator.
+
+The controller was based on the [Path Planning Walkthrough video](https://www.youtube.com/watch?v=7sI3VHFPP0w) linked from the Path Planning project description in Udacity's website, following the strategies and suggestions given there.
+
+#### Difficulty of this project
+My main struggle with this project was making sense of the sensor fusion data, and ensuring that my model was completely fed by measurements in meters, as initially I produced a model that kept the top velocity in miles per hour (this was a mistake). After ironing out these inconsistencies, the next big challenge was to ensure I could effectively expand the trajectory tree, calculate the cost for each separate trajectory, and obtain the cheapest one. I can tell that the solution I produced can be greatly optimized. For example, if half of my trajectories reuse the first one or  still re-calculate the cost associated for each trajectory independently. I could transform the code to be based more on a greedy strategy where I don't have to re-compute costs associated to common trails of separate trajectories.
+
+Another challenge that I didn't quite complete was producing a more sophisticated controller. The one I delivered with this assignment is functional and does produce smooth lane changes as well as keeping the car in the lane at all times. That said, it would be interesting to mount a PID or MPC that manages the trajectory based on the output of the path planner. This isn't necessary for this assignment to hit all the rubric points, but in practice I don't see how a real self-driving car would do without a more complete controller that accounted for variables such as the dimensionality of the vehicle, tire and road conditions, and jerk minimizing strategies.
+
+#### Final words
+Thank you for reading this far. And thank you for reviewing this engaging and challenging project!
