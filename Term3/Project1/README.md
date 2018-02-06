@@ -10,7 +10,7 @@ The goals / steps of this project are the following:
 [safety-perimeter]: ./images/safety-perimeter.png "Safety perimeter"
 [keep-lane]: ./images/keep-lane.gif "Keep lane"
 [passing]: ./images/passing.gif "Passing"
-
+[path-expansion]: ./images/path-expansion.png "Path expansion"
 
 ## Dependencies
 Run either [`install-mac.sh`](./install-mac.sh) or [`install-ubuntu.sh`](install-ubuntu.sh). In Windows it's recommended to use the Linux subsystem and follow the Ubuntu instructions.
@@ -76,7 +76,7 @@ Path planning then takes this value into account when producing an optimal value
 All these are combined to produce an optimal value that results in non-jerky acceleration, as well as car safety when approaching cars from behind or when attempting to change lanes.
 
 #### Max Acceleration and Jerk are not Exceeded.
-This path planning code reasons about acceleration, but uses a simplified model in which lane changes are immediate. Basically, it's a simplified model where acceleration is seen as a property of the `s` dimention but not of the `d` dimention, in Frenet coordinate speak. I separated the lane shifting acceleration problem to the controller and left the velocity acceleration problem to the path planner. This made my code very easy to reason with for multiple reasons:
+This path planning code reasons about acceleration, but uses a simplified model in which lane changes are immediate. Basically, it's a simplified model where acceleration is seen as a property of the `s` dimention but not of the `d` dimention, in Frenet coordinate speak. I separated the lane shifting acceleration problem to the controller and left the velocity acceleration problem to the path planner. This made my code very easy to work with for multiple reasons:
   1. I could run deep simulations up to 6 seconds in the future using the predictions for all the other vehicles in this simplified world view.
   2. It was easy to use the `PLCL` and `PLCR` (prepare lane change left/right) states to prepare the vehicle's speed to safe lane changes.
   3. Lane switching in the controller could be easily smoothed out with heuristics.
@@ -84,7 +84,7 @@ This path planning code reasons about acceleration, but uses a simplified model 
 In general the approach works. When I was midway in this implementation, and had only done steps 1 and 2 listed above, there were clear problems with lane switching elevating the total acceleration above the maximum defined in the simulator, and sometimes even the jerk. The lane switching smoothing was done with heuristics about how to generate the points for the spline used to obtain projected Y values given an X coordinate. The points are seeded with the last two points from the previous rendered frame, and are extended in two different ways:
   1. When keeping the lane: previous 2 points, +10, +20, +30, +60, +90.
   2. While switching lanes: previous 2 points, +30, +60, +90.
-As seen in main.cpp lines 410-429:
+As seen in `main.cpp` lines 410-429:
 ```C++
 // In Frenet, add evenly spaced points ahead of the end of the previous path
 vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
@@ -107,7 +107,7 @@ for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
     }
 }
 ```
-What this accomplies is the spline to be very stiff closer to the origin while driving in a lane, but becoming more flexible while switching lanes. The `is_changing_lane` flag is set to `true` whenever the vehicle model changes lane (again, for the model it's an immediate action) and is set back to `false` after the vehicle has reached coordinates close to the center of the lane.
+What this accomplies is the spline to be very stiff closer to the origin while driving in a lane, but becoming more flexible while switching lanes. The `is_changing_lane` flag is set to `true` whenever the vehicle model changes lane (again, for the model it's an immediate action) and is set back to `false` after the vehicle has reached coordinates close to the center of the target lane.
 
 This simple heuristic allows for fine control over the path while driving on a specific lane, and soft, non-jerky transitions between lanes.
 
@@ -170,4 +170,52 @@ Here's an example of these safety boxes in action while the car is attempting to
 
 The process to get here was iteritative, one in which I discovered and fixed issues one at a time. My starting point was the [Path Planning Walkthrough video](https://www.youtube.com/watch?v=7sI3VHFPP0w) linked from the Path Planning project description in Udacity's website. This allowed me to have basic control over the vehicle and to know where to begin with regards to the sensor fusion data.
 
-Next I started to work on separating the vehicle behavior from the basic controller code I already had. I did this by taking parts of the code I had produced for the behavior planning lab in lesson 4 of term 3 and adjusting it for my needs.
+Next I started to work on separating the vehicle behavior from the basic controller code I already had. I did this by taking parts of the code I had produced for the behavior planning lab in lesson 4 of term 3 and adjusting it for my needs. The main evolution in this code compared with the lab is that this solution is truly a deep search of an optimal path that expands the action tree at every timestep, generating a large number of possible trajectories and selecting the one that yields the lowest cost.
+
+The original code simply selected a possible state (keep lane, lane change left, etc.) and proceeded to see what would happen 3 seconds in the future after executing this action. The outcome was a less-than-ideal and non-realistic representation of the future. The solution evolved to be what you see in `update_state` in `vehicle.cpp`. Here we're running a prediction engine that will go, 1 second at a time, up to 6 seconds in the future expanding the trajectories tree with all possible states at any given point.
+
+I wish I was able to visualize these trajectories in the simulator to overlay the potential trajectories and their cost as they were happening, but alas, this is not supported. Had I been able to visualize what was going on I would have seen something like:
+
+![Path expansion][path-expansion]
+
+This gives us a set of trajectories (or trajectory expansion) that roughly looks like this:
+
+Lane   |   T=1 |   T=2 |   T=3 |   T=4 |
+ ------------ | :-----------: | -----------: | -----------: | -----------: |
+Rightmost | KL, LCL | KL, LCL | KL, LCL | KL, LCL |
+Center | | KL, LCL, LCR | KL, LCL, LCR | KL, LCL, LCR |
+Leftmost | |  | KL, LCR | KL, LCR |
+
+At time T=1, rightmost lane:
+  - KL: We can stay in the same lane (red line)
+  - LCL: We can change lane to the left (yellow line)
+
+At time T=2, rightmost lane:
+  - KL: We can stay in the same lane (red line)
+  - LCL: We can change lane to the left (yellow line)
+
+At time T=2, center lane:
+  - KL: We can stay in the same lane (red line)
+  - LCL: We can change lane to the left (yellow line)
+  - LCR: We can change lane to the right (green line)
+
+At time T=3, rightmost lane:
+  - KL: We can stay in the same lane (red line)
+  - LCL: We can change lane to the left (yellow line)
+
+At time T=3, center lane:
+  - KL: We can stay in the same lane (red line)
+  - LCL: We can change lane to the left (yellow line)
+  - LCR: We can change lane to the right (green line)
+
+At time T=3, leftmost lane:
+  - KL: We can stay in the same lane (red line)
+  - LCR: We can change lane to the right (green line)
+
+T=4 expands the same way as T=3 for all lanes.
+
+
+This path expansion is truly powerful given that we can find the best (cheapest) trajectory that involves all possible operations up to 6 seconds in the future, and leverages the predictions of where the other vehicles will be to evaluate the cost of each of the possible trajectories independently. A trajectory that results in a crash will be too costly compared to a clean trajectory. Two equal trajectories will be untied by preferring to stay in the current lane so as to minimize discomfort to the vehicle passengers.
+
+The code can be greatly optimized for performance, but it's functional and can visibly generate predictions that are very approximate to what I as a driver would do.
+
