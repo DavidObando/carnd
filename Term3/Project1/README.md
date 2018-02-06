@@ -1,10 +1,16 @@
-**Path Planning project**
+# Path Planning project
 
 The goals / steps of this project are the following:
   * Design a path planner that is able to create smooth, safe paths for the car to follow along a 3 lane highway with traffic.
   * A successful path planner will be able to keep inside its lane, avoid hitting other cars, and pass slower moving traffic all by using localization, sensor fusion, and map data.
 
---------------
+[//]: # (Image References)
+
+[stress-run]: ./images/stress-run.png "Stress run"
+[safety-perimeter]: ./images/safety-perimeter.png "Safety perimeter"
+[keep-lane]: ./images/keep-lane.gif "Keep lane"
+[passing]: ./images/passing.gif "Passing"
+
 
 ## Dependencies
 Run either [`install-mac.sh`](./install-mac.sh) or [`install-ubuntu.sh`](install-ubuntu.sh). In Windows it's recommended to use the Linux subsystem and follow the Ubuntu instructions.
@@ -37,21 +43,22 @@ Run either [`install-mac.sh`](./install-mac.sh) or [`install-ubuntu.sh`](install
 2. Compile: `cmake .. && make`
 3. Run it: `./path_planning`.
 
---------------
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/1020/view) Points
 
 ### Compilation 
 
 #### The code compiles correctly.
-It does. It has been tested on Windows (MinGW) and Ubuntu on Windows (via the [WSL](https://msdn.microsoft.com/en-us/commandline/wsl/about)), as well as macOS. Follow the instructions above and you should be good!
+It does. It has been tested on Windows (via the [WSL](https://msdn.microsoft.com/en-us/commandline/wsl/about)), as well as macOS. Follow the instructions above and you should be good!
 
 ### Valid Trajectories
 
 #### The car is able to drive at least 4.32 miles without incident.
-The car has been able to drive for over 20 miles without incidents being reported.
+The car has been able to drive for over 100 miles without incidents being reported during a stress run.
 
-### The car drives according to the speed limit.
+![Stress run][stress-run]
+
+#### The car drives according to the speed limit.
 I've set up the vehicle model to have a maximum speed slightly below the 50 miles per hour limit imposed. In `main.cpp` line 228 this is specified:
 ```C++
 double target_vel = toMetersPerSecond(46.85);
@@ -60,7 +67,15 @@ As you can see this speed limit is expressed in miles per hour (46.85 MPH) but s
 
 Finally, it's worth noting that the sensor fusion data obtained from the simulator gives us the other vehicle's speed and location using the metric system. This is very handy as helps us maintain a very consistent world view without much data transformation.
 
-### Max Acceleration and Jerk are not Exceeded.
+Path planning then takes this value into account when producing an optimal value for the acceleration of the vehicle at any given point in the prediction pipeline. Method `_max_accel_for_lane` in `vehicle.cpp` takes care of this by computing the maximum acceleration that we can produce (in meters per second) given a number of variables:
+  - The current velocity.
+  - The target velocity (the equivalent of 46.85 miles per hour).
+  - The immediate velocity of the nearest car in front.
+  - The immediate velocity of the nearest car behind.
+
+All these are combined to produce an optimal value that results in non-jerky acceleration, as well as car safety when approaching cars from behind or when attempting to change lanes.
+
+#### Max Acceleration and Jerk are not Exceeded.
 This path planning code reasons about acceleration, but uses a simplified model in which lane changes are immediate. Basically, it's a simplified model where acceleration is seen as a property of the `s` dimention but not of the `d` dimention, in Frenet coordinate speak. I separated the lane shifting acceleration problem to the controller and left the velocity acceleration problem to the path planner. This made my code very easy to reason with for multiple reasons:
   1. I could run deep simulations up to 6 seconds in the future using the predictions for all the other vehicles in this simplified world view.
   2. It was easy to use the `PLCL` and `PLCR` (prepare lane change left/right) states to prepare the vehicle's speed to safe lane changes.
@@ -71,32 +86,87 @@ In general the approach works. When I was midway in this implementation, and had
   2. While switching lanes: previous 2 points, +30, +60, +90.
 As seen in main.cpp lines 410-429:
 ```C++
-                    // In Frenet, add evenly spaced points ahead of the end of the previous path
-                    vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
-                    if (is_changing_lane)
-                    {
-                        wp_params = {{30,90,30}};
-                    }
-                    for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
-                    {
-                        for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
-                        {
-                            double projected_s = end_path_s + i;
-                            if (projected_s > MAX_S)
-                            {
-                                projected_s = projected_s - MAX_S;
-                            }
-                            vector<double> next_wp = getXY(projected_s, toD(ego.lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-                            ptsx.push_back(next_wp[0]);
-                            ptsy.push_back(next_wp[1]);
-                        }
-                    }
+// In Frenet, add evenly spaced points ahead of the end of the previous path
+vector<vector<int>> wp_params = {{10,30,10},{60,90,30}};
+if (is_changing_lane)
+{
+    wp_params = {{30,90,30}};
+}
+for (auto wp_param = wp_params.begin(); wp_param != wp_params.end(); wp_param++)
+{
+    for (int i = (*wp_param)[0]; i <= (*wp_param)[1]; i += (*wp_param)[2])
+    {
+        double projected_s = end_path_s + i;
+        if (projected_s > MAX_S)
+        {
+            projected_s = projected_s - MAX_S;
+        }
+        vector<double> next_wp = getXY(projected_s, toD(ego.lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+        ptsx.push_back(next_wp[0]);
+        ptsy.push_back(next_wp[1]);
+    }
+}
 ```
-What this accomplies is the spline to be very stiff closer to the origin while driving in a lane, but becoming more flexible while switching lanes. The `is_changing_lane` flag is set to true whenever the vehicle model changes lane (again, for the model it's an immediate action) and is set back to false after the vehicle has reached coordinates close to the center of the lane.
+What this accomplies is the spline to be very stiff closer to the origin while driving in a lane, but becoming more flexible while switching lanes. The `is_changing_lane` flag is set to `true` whenever the vehicle model changes lane (again, for the model it's an immediate action) and is set back to `false` after the vehicle has reached coordinates close to the center of the lane.
 
 This simple heuristic allows for fine control over the path while driving on a specific lane, and soft, non-jerky transitions between lanes.
 
---------------
+#### Car does not have collisions.
+The tests so far indicate the path planning is good enough to avoid collisions most of the time. After over two hours of stress testing, the vehicle has yet to incur in any faults, including collisions.
+
+Path planning accounts for collisions, and penalizes them heavily. Collision detection serves a fundamental role in determining what the most optimal state for the planner is. For example, if continuing at top speed on my current lane will result in a collision, I should find an alternative such as changing lanes or reducing the current velocity. Changing lanes might also result in a collision, so we have to be smart about detecting collisions in lane switching as well.
+
+The proposed solution is to establish what a collision is in terms not of an abstract point in space (which is unrealistic, as a vehicle has dimensionality) but of an area that's safe for the car to operate. When determining whether a collision occurs or not, I don't check whether the `s` dimension of vehicle A and vehicle B is the same. Instead, I account for a front buffer and a rear buffer. Since path planning is only done from the perspective of our car (sometimes referred to as `ego` in the comments) the buffer is defined as follows in `vehicle.h`:
+```C++
+static const int CHECK_COLLISION_PREFERRED_BUFFER_FRONT = 40;
+static const int CHECK_COLLISION_PREFERRED_BUFFER_BACK = 4;
+```
+This means `ego` wants to have 40 meters in front of it, and 4 meters behind it. If this condition isn't met, we flag the situation as a collision. In `vehicle.cpp`:
+```C++
+bool Vehicle::check_collision(Vehicle snapshot, double s_previous, double s_now)
+{
+    if (s_previous <= snapshot.s)
+    {
+        return s_now >= (snapshot.s - CHECK_COLLISION_PREFERRED_BUFFER_BACK);
+    }
+    if (s_previous > snapshot.s)
+    {
+        return s_now <= (snapshot.s + CHECK_COLLISION_PREFERRED_BUFFER_FRONT);
+    }
+    if (s_previous >= (snapshot.s - CHECK_COLLISION_PREFERRED_BUFFER_BACK))
+    {
+        auto v_target = s_now - s_previous;
+        return v_target > snapshot.v;
+    }
+    return false;
+}
+```
+The above code snippet is comparing the position of a future predicted state of `ego` (`snapshot.s`) against the predicted positions of another car (`s_previous` and `s_now`). We decide there's a collision in three separate cases:
+  1. When the other car was behind us, and is now 4 meters behind us or closer.
+  2. When the other car was ahead of us, and is now 40 meters ahead of us or closer.
+  3. When the other car is behind us, closer than 4 meters, and its velocity is such that it will ram into us in the next timestep.
+
+Given these conditions we can imagine the safety boxes being drawn somewhat like this:
+![Safety perimeter][safety-perimeter]
+
+In effect, these safety boxes help determining if we can change lanes, and also what our cruising velocity can be, as we'll reduce our velocity so as to keep `ego` from crossing into the buffer area.
+
+As a corollary, it would be great if the simulator had other rendering facilities separate from the green bubbles that display the path. I would very much like to draw these safety boxes on the ground, as well as ramifications of all the paths that I'm evaluating and their related cost. This has been very hard to observe given the toolset for this assignment, and makes me wish for an improved version of the simulator that also takes other forms of data to display in real time.
+
+
+#### The car stays in its lane, except for the time between changing lanes.
+Yes.
+
+![Keep lane][keep-lane]
+
+#### The car is able to change lanes
+
+Here's an example of these safety boxes in action while the car is attempting to cruise at maximum speed in traffic, and finds an opening through which it can change lanes avoiding a collision with anyone:
+
+![Passing][passing]
+
+
+### Reflection
 
 The process to get here was iteritative, one in which I discovered and fixed issues one at a time. My starting point was the [Path Planning Walkthrough video](https://www.youtube.com/watch?v=7sI3VHFPP0w) linked from the Path Planning project description in Udacity's website. This allowed me to have basic control over the vehicle and to know where to begin with regards to the sensor fusion data.
 
