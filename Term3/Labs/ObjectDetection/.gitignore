@@ -1,0 +1,5 @@
+.ipynb_checkpoints
+ssd_mobilenet_v1_coco*
+rfcn_resnet101_coco*
+faster_rcnn_inception_resnet_v2_atrous_coco*
+result.mp4
