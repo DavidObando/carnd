@@ -97,10 +97,16 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param keep_prob: TF Placeholder for dropout keep probability
     :param learning_rate: TF Placeholder for learning rate
     """
+    print("Training...")
+    print()
     sess.run(tf.global_variables_initializer())
-    for epic in range(epochs):
+    for epoch in range(epochs):
+        print("EPOCH {} ...".format(epoch+1))
         for image, label in get_batches_fn(batch_size):
             sess.run(train_op, feed_dict={input_image: image, correct_label: label, keep_prob: 1.0, learning_rate: 0.0001})
+            loss =  sess.run(cross_entropy_loss, feed_dict={input_image: image, correct_label: label, keep_prob: 1.0, learning_rate: 0.0001})
+            print("Cross Entropy Loss = {:.3f}".format(loss))
+        print()
 tests.test_train_nn(train_nn)
 
 
@@ -110,8 +116,8 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
-    epochs = 100
-    batch_size = 10
+    epochs = 8
+    batch_size = 12
 
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
