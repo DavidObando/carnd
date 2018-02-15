@@ -44,10 +44,10 @@ Yes. Refer to `main.py` lines 85-109. It runs as per the specified number of epo
 ### Neural Network Training
 
 #### Does the project train the model correctly?
-On average, the model decreases loss over time. The gains are big early on in the training but seem to stabilize by epoch 6.
+On average, the model decreases loss over time. The gains are big early on in the training but seem to stabilize by epoch 200.
 
 #### Does the project use reasonable hyperparameters?
-I found that the cross entropy loss doesn't decrease much after 5 or 6 epochs, as it appears to get stuck in some local minima with a loss value between 0.15 and 0.08. I ran up to 20 epochs but loss didn't move more. As seen in `main.py` lines 119-120 I left the code running only 8 epochs and the batch size to be 12. This was a good batch size given the memory constraints in my GPU.
+I found that the cross entropy loss doesn't decrease much after 200 or so epochs, as it appears to get stuck in some local minima with a loss value between 0.15 and 0.12. As seen in `main.py` lines 119-120 I left the code running only 200 epochs and the batch size to be 12. This was a good batch size given the memory constraints in my GPU.
 
 #### Does the project correctly label the road?
 The network does appear to correctly identify the road on all pictures with very little bleeding into non-road areas as seen in the following examples.

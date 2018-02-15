@@ -75,7 +75,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     """
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=correct_label, logits=logits)
-    cross_entropy_loss = tf.reduce_mean(cross_entropy)
+    cross_entropy_loss = tf.reduce_mean(cross_entropy) + sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
     optimizer = tf.train.AdamOptimizer(learning_rate)
     training_operation = optimizer.minimize(cross_entropy_loss)
     return logits, training_operation, cross_entropy_loss
@@ -103,8 +103,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     for epoch in range(epochs):
         print("EPOCH {} ...".format(epoch+1))
         for image, label in get_batches_fn(batch_size):
-            sess.run(train_op, feed_dict={input_image: image, correct_label: label, keep_prob: 1.0, learning_rate: 0.0001})
-            loss =  sess.run(cross_entropy_loss, feed_dict={input_image: image, correct_label: label, keep_prob: 1.0, learning_rate: 0.0001})
+            sess.run(train_op, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
+            loss =  sess.run(cross_entropy_loss, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
             print("Cross Entropy Loss = {:.3f}".format(loss))
         print()
 tests.test_train_nn(train_nn)
@@ -116,7 +116,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
-    epochs = 8
+    epochs = 200
     batch_size = 12
 
     # Download pretrained vgg model
