@@ -1,0 +1,6 @@
+__pycache__*
+ckpt*
+base_graph.pb
+frozen_graph.pb
+optimized_graph.pb
+eightbit_graph.pb
