@@ -116,7 +116,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     tests.test_for_kitti_dataset(data_dir)
-    epochs = 200
+    epochs = 400
     batch_size = 12
 
     # Download pretrained vgg model
@@ -148,7 +148,25 @@ def run():
         # Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
-        # OPTIONAL: Apply the trained model to a video
+        # Apply the trained model to a video
+        def video_pipeline(img):
+            image = scipy.misc.imresize(img, image_shape)
+            im_softmax = sess.run([tf.nn.softmax(logits)], {keep_prob: 1.0, input_image: [image]})
+            im_softmax = im_softmax[0][:, 1].reshape(image_shape[0], image_shape[1])
+            segmentation = (im_softmax > 0.5).reshape(image_shape[0], image_shape[1], 1)
+            mask = np.dot(segmentation, np.array([[0, 255, 0, 127]]))
+            mask = scipy.misc.imresize(mask, img.shape)
+            mask = scipy.misc.toimage(mask, mode="RGBA")
+            street_im = scipy.misc.toimage(img)
+            street_im.paste(mask, box=None, mask=mask)
+            return np.array(street_im)
+
+        from moviepy.editor import VideoFileClip
+        import scipy.misc
+        import numpy as np
+        clip = VideoFileClip('driving.mp4')
+        new_clip = clip.fl_image(video_pipeline)
+        new_clip.write_videofile('result.mp4')
 
 
 if __name__ == '__main__':
