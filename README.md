@@ -1,5 +1,5 @@
 # Welcome
-David Obando's repository for assignments and labs for Udacity's Self-Driving Car nanodegree. This is still a work in progress.
+David Obando's repository for assignments and labs for Udacity's [Self-Driving Car nanodegree](https://udacity.com/drive). This is still a work in progress.
 
 ## Term 1
   - [Project 1.1](./Term1/Project1/): Finding Lane Lines on the Road
