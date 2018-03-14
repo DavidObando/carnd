@@ -6,7 +6,7 @@ import random
 import scipy.misc
 import zipfile
 import shutil
-from urllib import urlretrieve
+from urllib.request import urlretrieve
 from tqdm import tqdm
 
 
@@ -76,7 +76,6 @@ def gen_batch_function(data_folder, image_shape):
             images = []
             labels = []
             for image_file in image_paths[batch_i:batch_i+batch_size]:
-                #image = scipy.misc.imread(image_file)
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
                 images.append(image)
                 label_class = int(os.path.basename(os.path.dirname(image_file)))
@@ -90,45 +89,22 @@ def load_vgg(sess, vgg_path):
     Load Pretrained VGG Model into TensorFlow.
     :param sess: TensorFlow Session
     :param vgg_path: Path to vgg folder, containing "variables/" and "saved_model.pb"
-    :return: Tuple of Tensors from VGG model (image_input, keep_prob, layer3_out, layer4_out, layer7_out)
+    :return: Tuple of Tensors from VGG model (image_input, keep_prob, layer7_out)
     """
     vgg_tag = 'vgg16'
     vgg_input_tensor_name = 'image_input:0'
     vgg_keep_prob_tensor_name = 'keep_prob:0'
-    vgg_layer3_out_tensor_name = 'layer3_out:0'
-    vgg_layer4_out_tensor_name = 'layer4_out:0'
     vgg_layer7_out_tensor_name = 'layer7_out:0'
 
     tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
     graph = tf.get_default_graph()
     vgg_input_tensor = graph.get_tensor_by_name(vgg_input_tensor_name)
     vgg_keep_prob_tensor = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
-    vgg_layer3_out_tensor = graph.get_tensor_by_name(vgg_layer3_out_tensor_name)
-    vgg_layer4_out_tensor = graph.get_tensor_by_name(vgg_layer4_out_tensor_name)
     vgg_layer7_out_tensor = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
 
-    return vgg_input_tensor, vgg_keep_prob_tensor, vgg_layer3_out_tensor, vgg_layer4_out_tensor, vgg_layer7_out_tensor
+    return vgg_input_tensor, vgg_keep_prob_tensor, vgg_layer7_out_tensor
 
-#def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
-#    """
-#    Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
-#    :param vgg_layer3_out: TF Tensor for VGG Layer 3 output
-#    :param vgg_layer4_out: TF Tensor for VGG Layer 4 output
-#    :param vgg_layer7_out: TF Tensor for VGG Layer 7 output
-#    :param num_classes: Number of classes to classify
-#    :return: The Tensor for the last layer of output
-#    """
-#    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1, 1), padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-#    vgg_layer4_out_last_dim_size = vgg_layer4_out.get_shape()[3]
-#    upsample_1 = tf.layers.conv2d_transpose(conv_1x1, vgg_layer4_out_last_dim_size, 4, strides=(2, 2), padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-#    upsample_1_plus_layer_4 = tf.add(upsample_1, vgg_layer4_out)
-#    vgg_layer3_out_last_dim_size = vgg_layer3_out.get_shape()[3]
-#    upsample_2 = tf.layers.conv2d_transpose(upsample_1_plus_layer_4, vgg_layer3_out_last_dim_size, 4, strides=(2, 2), padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-#    upsample_2_plus_layer_3 = tf.add(upsample_2, vgg_layer3_out)
-#    upsample_3 = tf.layers.conv2d_transpose(upsample_2_plus_layer_3, num_classes, 16, strides=(8, 8), padding='same', kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
-#    return upsample_3
-
-def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
+def layers(vgg_layer7_out, keep_prob, image_shape, num_classes):
     """
     Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
     :param vgg_layer3_out: TF Tensor for VGG Layer 3 output
@@ -140,10 +116,15 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     mu = 0
     sigma = 0.1
     flat_layer7 = tf.contrib.layers.flatten(vgg_layer7_out)
-    F_W = tf.Variable(tf.truncated_normal((368640, num_classes), mean = mu, stddev = sigma, dtype=tf.float32))
+    layer7_size = image_shape[0] * image_shape[1] * num_classes
+    F_W = tf.Variable(tf.truncated_normal((layer7_size, 100), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(100))
+    fully_connected = tf.matmul(flat_layer7, F_W) + F_b
+    activated = tf.nn.relu(fully_connected)
+    dropout = tf.nn.dropout(activated, keep_prob)
+    F_W = tf.Variable(tf.truncated_normal((100, num_classes), mean = mu, stddev = sigma, dtype=tf.float32))
     F_b = tf.Variable(tf.zeros(num_classes))
-    logits = tf.matmul(flat_layer7, F_W) + F_b
-    print(logits.get_shape())
+    logits = tf.matmul(dropout, F_W) + F_b
     return logits
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
@@ -160,9 +141,11 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     cross_entropy_loss = tf.reduce_mean(cross_entropy) + sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
     optimizer = tf.train.AdamOptimizer(learning_rate)
     training_operation = optimizer.minimize(cross_entropy_loss)
-    return logits, training_operation, cross_entropy_loss
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(correct_label, 1))
+    accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    return logits, training_operation, cross_entropy_loss, accuracy_operation
 
-def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
+def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, accuracy_operation, input_image,
              correct_label, keep_prob, learning_rate):
     """
     Train neural network and print out the loss during training.
@@ -186,10 +169,12 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
             sess.run(train_op, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
             loss =  sess.run(cross_entropy_loss, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
             print("Cross Entropy Loss = {:.3f}".format(loss))
+            validation_accuracy = sess.run(accuracy_operation, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
+            print("Validation Accuracy = {:.3f}".format(validation_accuracy))
     print()
 
 def run():
-    epochs = 1
+    epochs = 20
     batch_size = 10
     num_classes = 4
     image_shape = (160, 576)
@@ -209,16 +194,16 @@ def run():
 
 
         # Build NN using load_vgg, layers, and optimize function
-        input_image, keep_prob, layer3_out, layer4_out, layer7_out = load_vgg(sess, vgg_path)
-        last_layer = layers(layer3_out, layer4_out, layer7_out, num_classes)
+        input_image, keep_prob, layer7_out = load_vgg(sess, vgg_path)
+        last_layer = layers(layer7_out, keep_prob, image_shape, num_classes)
         correct_label = tf.placeholder(tf.int32, shape=[None, num_classes], name="correct_label")
         learning_rate = tf.placeholder(tf.float32, name="learning_rate")
-        logits, train_op, cross_entropy_loss = optimize(last_layer, correct_label, learning_rate, num_classes)
+        logits, train_op, cross_entropy_loss, accuracy_operation = optimize(last_layer, correct_label, learning_rate, num_classes)
 
         # Train NN using the train_nn function
-        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob, learning_rate)
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, accuracy_operation, input_image, correct_label, keep_prob, learning_rate)
 
-        builder.add_meta_graph_and_variables(sess, ["capstone-vgg16"])
+        builder.add_meta_graph_and_variables(sess, ["gauss-capstone-vgg16"])
 
     builder.save()
 
