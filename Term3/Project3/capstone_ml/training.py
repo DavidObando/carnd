@@ -77,6 +77,7 @@ def gen_batch_function(data_folder, image_shape):
             labels = []
             for image_file in image_paths[batch_i:batch_i+batch_size]:
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+                image = (image - 128.) / 128. # normalize the image data
                 images.append(image)
                 label_class = int(os.path.basename(os.path.dirname(image_file)))
                 labels.append(label_classes[label_class])
@@ -107,36 +108,40 @@ def load_vgg(sess, vgg_path):
 def layers(vgg_layer7_out, keep_prob, image_shape, num_classes):
     """
     Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
-    :param vgg_layer3_out: TF Tensor for VGG Layer 3 output
-    :param vgg_layer4_out: TF Tensor for VGG Layer 4 output
     :param vgg_layer7_out: TF Tensor for VGG Layer 7 output
     :param num_classes: Number of classes to classify
     :return: The Tensor for the last layer of output
     """
     mu = 0
     sigma = 0.1
-    flat_layer7 = tf.contrib.layers.flatten(vgg_layer7_out)
+    fully_connected_1_size = 200
     layer7_size = image_shape[0] * image_shape[1] * num_classes
-    F_W = tf.Variable(tf.truncated_normal((layer7_size, 100), mean = mu, stddev = sigma, dtype=tf.float32))
-    F_b = tf.Variable(tf.zeros(100))
-    fully_connected = tf.matmul(flat_layer7, F_W) + F_b
-    activated = tf.nn.relu(fully_connected)
+    flat_layer7 = tf.contrib.layers.flatten(vgg_layer7_out)
+    F_W = tf.Variable(tf.truncated_normal((layer7_size, fully_connected_1_size), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(fully_connected_1_size))
+    fully_connected_1 = tf.matmul(flat_layer7, F_W) + F_b
+    activated = tf.nn.relu(fully_connected_1)
     dropout = tf.nn.dropout(activated, keep_prob)
-    F_W = tf.Variable(tf.truncated_normal((100, num_classes), mean = mu, stddev = sigma, dtype=tf.float32))
+    fully_connected_2_size = 40
+    F_W = tf.Variable(tf.truncated_normal((fully_connected_1_size, fully_connected_2_size), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(fully_connected_2_size))
+    fully_connected_2 = tf.matmul(dropout, F_W) + F_b
+    activated = tf.nn.relu(fully_connected_2)
+    dropout = tf.nn.dropout(activated, keep_prob)
+    F_W = tf.Variable(tf.truncated_normal((fully_connected_2_size, num_classes), mean = mu, stddev = sigma, dtype=tf.float32))
     F_b = tf.Variable(tf.zeros(num_classes))
     logits = tf.matmul(dropout, F_W) + F_b
     return logits
 
-def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
+def optimize(logits, correct_label, learning_rate, num_classes):
     """
     Build the TensorFLow loss and optimizer operations.
-    :param nn_last_layer: TF Tensor of the last layer in the neural network
+    :param logits: TF Tensor of the last layer in the neural network
     :param correct_label: TF Placeholder for the correct label image
     :param learning_rate: TF Placeholder for the learning rate
     :param num_classes: Number of classes to classify
     :return: Tuple of (logits, train_op, cross_entropy_loss)
     """
-    logits = tf.reshape(nn_last_layer, (-1, num_classes))
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=correct_label, logits=logits)
     cross_entropy_loss = tf.reduce_mean(cross_entropy) + sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
     optimizer = tf.train.AdamOptimizer(learning_rate)
@@ -168,9 +173,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         for image, label in get_batches_fn(batch_size):
             sess.run(train_op, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
             loss =  sess.run(cross_entropy_loss, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
-            print("Cross Entropy Loss = {:.3f}".format(loss))
             validation_accuracy = sess.run(accuracy_operation, feed_dict={input_image: image, correct_label: label, keep_prob: 0.8, learning_rate: 1e-4})
-            print("Validation Accuracy = {:.3f}".format(validation_accuracy))
+            print("E{} - Cross Entropy Loss = {:.3f} - Validation Accuracy = {:.3f}".format(epoch+1, loss, validation_accuracy))
     print()
 
 def run():
@@ -203,7 +207,7 @@ def run():
         # Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, accuracy_operation, input_image, correct_label, keep_prob, learning_rate)
 
-        builder.add_meta_graph_and_variables(sess, ["gauss-capstone-vgg16"])
+        builder.add_meta_graph_and_variables(sess, ["gauss-capstone"])
 
     builder.save()
 
