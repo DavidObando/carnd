@@ -7,52 +7,7 @@ import scipy.misc
 import zipfile
 import shutil
 from urllib.request import urlretrieve
-from tqdm import tqdm
 
-
-class DLProgress(tqdm):
-    last_block = 0
-
-    def hook(self, block_num=1, block_size=1, total_size=None):
-        self.total = total_size
-        self.update((block_num - self.last_block) * block_size)
-        self.last_block = block_num
-
-def maybe_download_pretrained_vgg(data_dir):
-    """
-    Download and extract pretrained vgg model if it doesn't exist
-    :param data_dir: Directory to download the model to
-    """
-    vgg_filename = 'vgg.zip'
-    vgg_path = os.path.join(data_dir, 'vgg')
-    vgg_files = [
-        os.path.join(vgg_path, 'variables/variables.data-00000-of-00001'),
-        os.path.join(vgg_path, 'variables/variables.index'),
-        os.path.join(vgg_path, 'saved_model.pb')]
-
-    missing_vgg_files = [vgg_file for vgg_file in vgg_files if not os.path.exists(vgg_file)]
-    if missing_vgg_files:
-        # Clean vgg dir
-        if os.path.exists(vgg_path):
-            shutil.rmtree(vgg_path)
-        os.makedirs(vgg_path)
-
-        # Download vgg
-        print('Downloading pre-trained vgg model...')
-        with DLProgress(unit='B', unit_scale=True, miniters=1) as pbar:
-            urlretrieve(
-                'https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/vgg.zip',
-                os.path.join(vgg_path, vgg_filename),
-                pbar.hook)
-
-        # Extract vgg
-        print('Extracting model...')
-        zip_ref = zipfile.ZipFile(os.path.join(vgg_path, vgg_filename), 'r')
-        zip_ref.extractall(data_dir)
-        zip_ref.close()
-
-        # Remove zip file to save space
-        os.remove(os.path.join(vgg_path, vgg_filename))
 
 def gen_batch_function(data_folder, image_shape):
     """
@@ -85,52 +40,134 @@ def gen_batch_function(data_folder, image_shape):
             yield np.array(images), np.array(labels)
     return get_batches_fn
 
-def load_vgg(sess, vgg_path):
-    """
-    Load Pretrained VGG Model into TensorFlow.
-    :param sess: TensorFlow Session
-    :param vgg_path: Path to vgg folder, containing "variables/" and "saved_model.pb"
-    :return: Tuple of Tensors from VGG model (image_input, keep_prob, layer7_out)
-    """
-    vgg_tag = 'vgg16'
-    vgg_input_tensor_name = 'image_input:0'
-    vgg_keep_prob_tensor_name = 'keep_prob:0'
-    vgg_layer7_out_tensor_name = 'layer7_out:0'
-
-    tf.saved_model.loader.load(sess, [vgg_tag], vgg_path)
-    graph = tf.get_default_graph()
-    vgg_input_tensor = graph.get_tensor_by_name(vgg_input_tensor_name)
-    vgg_keep_prob_tensor = graph.get_tensor_by_name(vgg_keep_prob_tensor_name)
-    vgg_layer7_out_tensor = graph.get_tensor_by_name(vgg_layer7_out_tensor_name)
-
-    return vgg_input_tensor, vgg_keep_prob_tensor, vgg_layer7_out_tensor
-
-def layers(vgg_layer7_out, keep_prob, image_shape, num_classes):
-    """
-    Create the layers for a fully convolutional network.  Build skip-layers using the vgg layers.
-    :param vgg_layer7_out: TF Tensor for VGG Layer 7 output
-    :param num_classes: Number of classes to classify
-    :return: The Tensor for the last layer of output
-    """
+def layers(input_layer, keep_probability, image_shape, num_classes):
+    # Arguments used for tf.truncated_normal, randomly defines variables for the weights and biases for each layer
     mu = 0
     sigma = 0.1
-    fully_connected_1_size = 200
-    layer7_size = image_shape[0] * image_shape[1] * num_classes
-    flat_layer7 = tf.contrib.layers.flatten(vgg_layer7_out)
-    F_W = tf.Variable(tf.truncated_normal((layer7_size, fully_connected_1_size), mean = mu, stddev = sigma, dtype=tf.float32))
-    F_b = tf.Variable(tf.zeros(fully_connected_1_size))
-    fully_connected_1 = tf.matmul(flat_layer7, F_W) + F_b
-    activated = tf.nn.relu(fully_connected_1)
-    dropout = tf.nn.dropout(activated, keep_prob)
-    fully_connected_2_size = 40
-    F_W = tf.Variable(tf.truncated_normal((fully_connected_1_size, fully_connected_2_size), mean = mu, stddev = sigma, dtype=tf.float32))
-    F_b = tf.Variable(tf.zeros(fully_connected_2_size))
-    fully_connected_2 = tf.matmul(dropout, F_W) + F_b
-    activated = tf.nn.relu(fully_connected_2)
-    dropout = tf.nn.dropout(activated, keep_prob)
-    F_W = tf.Variable(tf.truncated_normal((fully_connected_2_size, num_classes), mean = mu, stddev = sigma, dtype=tf.float32))
+
+    # Layer 1: Convolutional. Input = image_shape[0] x image_shape[1] x 3. Output = 28 x 28 x 6.
+    # new_height = (input_height - filter_height + 2 * P)/S + 1
+    # 28 = ((image_shape[0] - fh)/S) + 1
+    #(27 * S) + fh = image_shape[0]
+    # S = 1, fh = image_shape[0] - 27
+    F_W = tf.Variable(tf.truncated_normal((image_shape[0] - 27, image_shape[1] - 27, 3, 6), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(6))
+    strides = [1, 1, 1, 1]
+    padding = 'VALID'
+    layer1 = tf.nn.conv2d(input_layer, F_W, strides, padding) + F_b
+
+    # Activation 1.
+    layer1 = tf.nn.relu(layer1)
+
+    # Pooling 1. Input = 28x28x6. Output = 14x14x6.
+    # new_height = (input_height - filter_height)/S + 1
+    # 14 = ((28 - fh)/S) + 1
+    # (13 * S) + fh = 28
+    # S = 2, fh = 2
+    ksize=[1, 2, 2, 1]
+    strides=[1, 2, 2, 1]
+    padding = 'VALID'
+    pooling_layer1 = tf.nn.max_pool(layer1, ksize, strides, padding)
+    
+    # Dropout 1.
+    pooling_layer1 = tf.nn.dropout(pooling_layer1, keep_probability)
+    
+    # Flatten 2a. Input = 14x14x6. Output = 1176.
+    flatten_layer2a = tf.contrib.layers.flatten(pooling_layer1)
+
+    # Layer 2b: Convolutional. Input = 14x14x6. Output = 10x10x16.
+    # new_height = (input_height - filter_height + 2 * P)/S + 1
+    # 10 = ((14 - fh)/S) + 1
+    # (9 * S) + fh = 14
+    # S = 1, fh = 5
+    F_W = tf.Variable(tf.truncated_normal((5, 5, 6, 16), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(16))
+    strides = [1, 1, 1, 1]
+    padding = 'VALID'
+    layer2b = tf.nn.conv2d(pooling_layer1, F_W, strides, padding) + F_b
+    
+    # Activation 2b.
+    layer2b = tf.nn.relu(layer2b)
+
+    # Pooling 2b. Input = 10x10x16. Output = 5x5x16.
+    # new_height = (input_height - filter_height)/S + 1
+    # 5 = ((10 - fh)/S) + 1
+    # (4 * S) + fh = 10
+    # S = 2, fh = 2
+    ksize=[1, 2, 2, 1]
+    strides=[1, 2, 2, 1]
+    padding = 'VALID'
+    pooling_layer2b = tf.nn.max_pool(layer2b, ksize, strides, padding)
+
+    # Dropout 2b.
+    pooling_layer2b = tf.nn.dropout(pooling_layer2b, keep_probability)
+
+    # Flatten 2b. Input = 5x5x16. Output = 400.
+    flatten_layer2b = tf.contrib.layers.flatten(pooling_layer2b)
+    
+    # Layer 2c: Convolutional. Input = 5x5x16. Output = 3x3x32.
+    # new_height = (input_height - filter_height + 2 * P)/S + 1
+    # 3 = ((5 - fh)/S) + 1
+    # (2 * S) + fh = 5
+    # S = 2, fh = 1
+    F_W = tf.Variable(tf.truncated_normal((1, 1, 16, 32), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(32))
+    strides = [1, 2, 2, 1]
+    padding = 'VALID'
+    layer2c = tf.nn.conv2d(pooling_layer2b, F_W, strides, padding) + F_b
+    
+    # Activation 2c.
+    layer2c = tf.nn.relu(layer2c)
+
+    # Pooling 2c. Input = 3x3x32. Output = 2x2x32.
+    # new_height = (input_height - filter_height)/S + 1
+    # 2 = ((3 - fh)/S) + 1
+    # (1 * S) + fh = 3
+    # S = 2, fh = 1
+    ksize=[1, 1, 1, 1]
+    strides=[1, 2, 2, 1]
+    padding = 'VALID'
+    pooling_layer2c = tf.nn.max_pool(layer2c, ksize, strides, padding)
+
+    # Dropout 2c.
+    pooling_layer2c = tf.nn.dropout(pooling_layer2c, keep_probability)
+
+    # Flatten 2c. Input = 2x2x32. Output = 128.
+    flatten_layer2c = tf.contrib.layers.flatten(pooling_layer2c)
+    
+    # Concat layers 2a, 2b, 2c. Input = 1176 + 400 + 128. Output = 1704.
+    flat_layer2 = tf.concat([tf.concat([flatten_layer2b, flatten_layer2a], 1), flatten_layer2c], 1)
+    
+    # Layer 3: Fully Connected. Input = 1704. Output = 120.
+    F_W = tf.Variable(tf.truncated_normal((1704, 120), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(120))
+    fully_connected = tf.matmul(flat_layer2, F_W) + F_b
+    
+    # Activation 3.
+    fully_connected = tf.nn.relu(fully_connected)
+    
+    # Dropout 3.
+    fully_connected = tf.nn.dropout(fully_connected, keep_probability)
+
+    # Layer 4: Fully Connected. Input = 120. Output = 84.
+    F_W = tf.Variable(tf.truncated_normal((120, 84), mean = mu, stddev = sigma, dtype=tf.float32))
+    F_b = tf.Variable(tf.zeros(84))
+    fully_connected = tf.matmul(fully_connected, F_W) + F_b
+    
+    # Activation 4.
+    fully_connected = tf.nn.relu(fully_connected)
+
+    # Dropout 4.
+    fully_connected = tf.nn.dropout(fully_connected, keep_probability)
+
+    # Layer 5: Fully Connected. Input = 84. Output = num_classes.
+    F_W = tf.Variable(tf.truncated_normal((84, num_classes), mean = mu, stddev = sigma, dtype=tf.float32))
     F_b = tf.Variable(tf.zeros(num_classes))
-    logits = tf.matmul(dropout, F_W) + F_b
+    logits = tf.matmul(fully_connected, F_W) + F_b
+    
+    # Dropout 5.
+    logits = tf.nn.dropout(logits, keep_probability)
+
     return logits
 
 def optimize(logits, correct_label, learning_rate, num_classes):
@@ -178,34 +215,30 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     print()
 
 def run():
-    epochs = 20
-    batch_size = 10
+    epochs = 100
+    batch_size = 400
     num_classes = 4
-    image_shape = (160, 576)
+    image_shape = (300, 400)
     data_dir = './data'
     export_dir = './output'
-
-    # Download pretrained vgg model
-    maybe_download_pretrained_vgg(data_dir)
 
     builder = tf.saved_model.builder.SavedModelBuilder(export_dir)
 
     with tf.Session() as sess:
-        # Path to vgg model
-        vgg_path = os.path.join(data_dir, 'vgg')
         # Create function to get batches
         get_batches_fn = gen_batch_function(os.path.join(data_dir, 'capture'), image_shape)
 
 
-        # Build NN using load_vgg, layers, and optimize function
-        input_image, keep_prob, layer7_out = load_vgg(sess, vgg_path)
-        last_layer = layers(layer7_out, keep_prob, image_shape, num_classes)
+        # Build NN using layers, and optimize function
+        input_layer = tf.placeholder(tf.float32, (None, image_shape[0], image_shape[1], 3),  name="input_layer")
+        keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+        last_layer = layers(input_layer, keep_prob, image_shape, num_classes)
         correct_label = tf.placeholder(tf.int32, shape=[None, num_classes], name="correct_label")
         learning_rate = tf.placeholder(tf.float32, name="learning_rate")
         logits, train_op, cross_entropy_loss, accuracy_operation = optimize(last_layer, correct_label, learning_rate, num_classes)
 
         # Train NN using the train_nn function
-        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, accuracy_operation, input_image, correct_label, keep_prob, learning_rate)
+        train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, accuracy_operation, input_layer, correct_label, keep_prob, learning_rate)
 
         builder.add_meta_graph_and_variables(sess, ["gauss-capstone"])
 
