@@ -1,5 +1,5 @@
 # Welcome
-David Obando's repository for assignments and labs for Udacity's [Self-Driving Car nanodegree](https://udacity.com/drive). This is still a work in progress.
+David Obando's repository for assignments and labs for Udacity's [Self-Driving Car Nanodegree](https://udacity.com/drive). This is still a work in progress.
 
 ## Term 1: Computer Vision and Deep Learning
   - [Home](./Term1/)
@@ -21,3 +21,4 @@ David Obando's repository for assignments and labs for Udacity's [Self-Driving C
   - [Home](./Term3/)
   - [Project 3.1](./Term3/Project1/): Path Planning
   - [Project 3.2](./Term3/Project2/): Semantic Segmentation
+  - [Project 3.3](./Term3/Project3/): Final project: Programming a Real Self-Driving Car
