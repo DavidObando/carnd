@@ -183,8 +183,9 @@ This is the result I observe after plotting:
 
 #### Provide a link to your final video output. Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!)
 
-Here's a video of the outcome of this code:
-  - Youtube [video](https://youtu.be/S0oM7TWZ3wQ)
+Here's a video of the outcome of this code (link to [youtube](https://www.youtube.com/watch?v=S0oM7TWZ3wQ)):
+
+  [![Video](https://img.youtube.com/vi/S0oM7TWZ3wQ/0.jpg)](https://www.youtube.com/watch?v=S0oM7TWZ3wQ)
 
 Also available for download from my [Github repository](https://github.com/DavidObando/carnd/tree/master/Term1/Project4). Look for file `processed_project_video.mp4`.
 
